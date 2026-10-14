@@ -104,7 +104,7 @@ function setM(){M=$('#my').value+'-'+String($('#mm').value).padStart(2,'0');rend
 
 // ---- saklar Online / Offline (hanya di aplikasi HP/PWA) ----
 const modeSw=()=>window.MODE?`<button class="md ${MODE.off()?'off':''}" onclick="togMode()" aria-label="Mode online atau offline"><span>${MODE.off()?'Offline':'Online'}</span><i></i></button>`:'<div class="chip">Kepala Bengkel<b>'+esc(S.kepala)+'</b></div>';
-function togMode(){MODE.set(!MODE.off());head();toast(MODE.off()?'Mode OFFLINE: memakai data di HP, input masuk antrean':'Mode ONLINE: tersambung ke server');if(!MODE.off()&&P=='dash')render()}
+function togMode(){MODE.set(!MODE.off());head();toast(MODE.off()?'Mode OFFLINE: ringkasan dari HP, input langsung ke Google Sheet':'Mode ONLINE: semua data langsung dari server');if(!MODE.off()&&P=='dash')render()}
 // ---- header, menu bawah, router ----
 function head(x){$('header').innerHTML=x
  ?`<button class="ib" onclick="go('${x.back||'dash'}')" aria-label="Kembali">${ic('back',28)}</button><div class="lg">${ic(x.i,28,x.c)}</div><div class="tt"><b style="font-size:20px">${x.t}</b><span>${x.s}</span></div>`
