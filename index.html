@@ -58,6 +58,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 .tb{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th{background:#E2EEFF;padding:10px 8px}td{padding:10px 8px;text-align:center;border-bottom:1px solid #EEF0F6}tr:nth-child(even) td{background:#F4F8FE}td a{color:var(--b)}
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--t);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:9;max-width:90%}
 @media print{header,nav,.np{display:none!important}main{padding:0}.cd{box-shadow:none}}
+.md{display:flex;align-items:center;gap:6px;border:0;border-radius:20px;background:rgba(255,255,255,.18);color:#fff;padding:5px 8px 5px 10px;font-size:11px;font-weight:700}
+.md i{position:relative;width:34px;height:20px;border-radius:10px;background:#22C55E;transition:.2s;flex:none}
+.md i:after{content:"";position:absolute;top:2px;left:16px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.md.off i{background:#94A3B8}.md.off i:after{left:2px}
 </style>
 
 </head>
@@ -98,10 +102,13 @@ const fm=m=>BLN[+m.slice(5)-1]+' '+m.slice(0,4),bl=()=>BLN[+M.slice(5)-1];
 const msel=()=>`<div class="mp np">${ic('cal',20,'#0B5ED7')}<select id="mm" aria-label="Bulan" onchange="setM()">${opt(BLN.map((b,i)=>(i+1)+'|'+b),+M.slice(5))}</select><select id="my" aria-label="Tahun" onchange="setM()">${opt(yrs(),M.slice(0,4))}</select></div>`;
 function setM(){M=$('#my').value+'-'+String($('#mm').value).padStart(2,'0');render()}
 
+// ---- saklar Online / Offline (hanya di aplikasi HP/PWA) ----
+const modeSw=()=>window.MODE?`<button class="md ${MODE.off()?'off':''}" onclick="togMode()" aria-label="Mode online atau offline"><span>${MODE.off()?'Offline':'Online'}</span><i></i></button>`:'<div class="chip">Kepala Bengkel<b>'+esc(S.kepala)+'</b></div>';
+function togMode(){MODE.set(!MODE.off());head();toast(MODE.off()?'Mode OFFLINE: memakai data di HP, input masuk antrean':'Mode ONLINE: tersambung ke server');if(!MODE.off()&&P=='dash')render()}
 // ---- header, menu bawah, router ----
 function head(x){$('header').innerHTML=x
  ?`<button class="ib" onclick="go('${x.back||'dash'}')" aria-label="Kembali">${ic('back',28)}</button><div class="lg">${ic(x.i,28,x.c)}</div><div class="tt"><b style="font-size:20px">${x.t}</b><span>${x.s}</span></div>`
- :`<button class="ib" onclick="go('dash')" aria-label="Menu">${ic('menu')}</button><div class="lg">${ic('car',28,'#0B5ED7')}</div><div class="tt"><b>Monitoring KLAIM MW</b><span>${esc(S.pool)}</span></div><div class="chip">Kepala Bengkel<b>${esc(S.kepala)}</b></div><div class="av">${esc(((U&&U.nama)||'?')[0].toUpperCase())}</div>`}
+ :`<button class="ib" onclick="go('dash')" aria-label="Menu">${ic('menu')}</button><div class="lg">${ic('car',28,'#0B5ED7')}</div><div class="tt"><b>Monitoring KLAIM MW</b><span>${esc(S.pool)}</span></div>${modeSw()}<div class="av">${esc(((U&&U.nama)||'?')[0].toUpperCase())}</div>`}
 function nv(){const on={dash:0,frek:0,lap:1,input:2,form:2,set:3}[P];$('nav').innerHTML=[['dash','Dashboard','home'],['lap','Laporan','file'],['input','Input Data','plus'],['set','Pengaturan','gear']].map(([p,t,i],n)=>`<button class="${n==on?'on':''}" onclick="go('${p}')">${ic(i,26)}${t}</button>`).join('')}
 function go(p,x){P=p;X=x;window.scrollTo(0,0);nv();render()}
 async function render(){V.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';try{await({dash:vDash,input:vInput,form:vForm,lap:vLap,frek:vFrek,set:vSet}[P])()}catch(e){toast(e.message||'Terjadi kesalahan')}}
@@ -233,9 +240,9 @@ async function vSet(){
  V.innerHTML=h}
 let US=[];
 function fillU(i){const x=US[i];$('#uu').value=x.Username;$('#un').value=x.Nama;$('#ur').value=x.Peran;$('#up').value=''}
-async function saveU(){try{await run('saveUser',{Username:$('#uu').value,Nama:$('#un').value,Password:$('#up').value,Peran:$('#ur').value});toast('Pengguna tersimpan');render()}catch(e){toast(e.message)}}
+async function saveU(){try{await run('saveUser',{Username:$('#uu').value,Nama:$('#un').value,Password:$('#up').value,Peran:$('#ur').value});toast('Pengguna tersimpan');go('dash')}catch(e){toast(e.message)}}
 async function delU(i){if(!confirm('Hapus pengguna '+US[i].Username+'?'))return;try{await run('hapusUser',US[i].Username);render()}catch(e){toast(e.message)}}
-async function chgPw(){try{await run('ubahPassword',$('#po').value,$('#pn').value);toast('Password diganti');render()}catch(e){toast(e.message)}}
+async function chgPw(){try{await run('ubahPassword',$('#po').value,$('#pn').value);toast('Password diganti');go('dash')}catch(e){toast(e.message)}}
 async function saveSet(){
  const o={};SF.forEach(([k])=>o[k]=$('#s_'+k).value.trim());
  try{await run('saveSettings',o);S=await run('getSettings');toast('Pengaturan tersimpan');render()}catch(e){toast(e.message||'Gagal menyimpan')}}
