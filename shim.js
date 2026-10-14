@@ -30,9 +30,21 @@
   const cacheGet = async k => ((await kv('get', 'cache')) || {})[k];
   const cacheSet = async (k, v) => { const c = (await kv('get', 'cache')) || {}; c[k] = v; await kv('set', 'cache', c); };
 
+  // ---------- saklar Online / Offline (dipilih petugas di header) ----------
+  const isOff = () => { try { return localStorage.getItem('mode') == 'off'; } catch (e) { return false; } };
+  window.MODE = {
+    off: isOff,
+    set(v) {  // v = true -> offline
+      try { localStorage.setItem('mode', v ? 'off' : 'on'); } catch (e) {}
+      badge();
+      if (!v) flush().then(warm);
+    }
+  };
+
   // ---------- panggilan ke server ----------
   class NetErr extends Error {}
-  async function rpc(fn, args) {
+  async function rpc(fn, args, force) {
+    if (isOff() && !force) throw new NetErr('Mode offline aktif');  // tidak menghubungi server sama sekali
     let res;
     try { res = await fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: fn, args: args})}); }
     catch (e) { throw new NetErr('Tidak ada koneksi internet'); }
@@ -88,7 +100,7 @@
 
   // ---------- kirim antrean ke server ----------
   async function flush() {
-    if (busy || !navigator.onLine) return;
+    if (busy || !navigator.onLine || isOff()) return;
     busy = true;
     let synced = false;
     try {
@@ -136,7 +148,7 @@
   let lastWarm = 0;
   async function warm() {
     const tk = localStorage.getItem('tk');
-    if (!tk || !navigator.onLine || Date.now() - lastWarm < 300000) return;
+    if (!tk || !navigator.onLine || isOff() || Date.now() - lastWarm < 300000) return;
     lastWarm = Date.now();
     const d = new Date(), m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]]];
@@ -169,12 +181,12 @@
       catch (e) { if (e instanceof NetErr) { const s = await kv('get', 'session'); if (s) return s; } throw e; }
     }
     if (fn == 'login') {
-      const r = await rpc(fn, a);
+      const r = await rpc(fn, a, true);  // login selalu ke server, walau mode offline
       kv('set', 'session', {username: r.username, nama: r.nama, peran: r.peran});
       setTimeout(() => flush().then(warm), 1500);
       return r;
     }
-    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); return rpc(fn, a).catch(() => true); }
+    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); return rpc(fn, a, true).catch(() => true); }
     return rpc(fn, a);
   }
   const mk = (ok, no) => new Proxy({}, {get: (t, p) => {
