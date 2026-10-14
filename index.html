@@ -285,6 +285,194 @@ async function saveLC(){
   setTimeout(()=>go('dash'),800)
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
+ // ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
+(function(){const s=document.createElement('style');s.textContent=`
+.dg{gap:4px}.dg .tl{padding:8px 1px 6px}.dg .tl .n{font-size:28px}.dg .tl b{font-size:10px}.dg .tl .u{font-size:10px}.dg .ch{font-size:10px;width:94%}
+.tk{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--ln);font-size:13.5px}.tk:last-of-type{border-bottom:0}.tk span{color:var(--m)}.tk b{text-align:right;word-break:break-word}
+.tkn{font-size:11.5px;color:var(--m);margin:6px 0 0;line-height:1.5}
+.qr{width:min(100%,250px);margin:8px auto 10px;padding:8px;background:#fff;border:1px solid var(--ln);border-radius:12px}
+.qs{text-align:center;font-size:13px;font-weight:700;padding:10px;border-radius:10px;background:#FFF1D6;color:#B45309;margin:10px 0}.qs.ok{background:#DFF6E6;color:#15803D}.qs.er{background:#FDE4E4;color:#B91C1C}
+.sg{position:relative;margin-top:6px;border:2px dashed #B7C4E6;border-radius:12px;background:#fff;height:200px}.sg canvas{width:100%;height:100%;display:block;touch-action:none;border-radius:10px}
+.sg span{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#AEB7D0;font-size:14px;pointer-events:none}
+.btn:disabled{opacity:.45}`;document.head.appendChild(s)})();
+IC.sign='<path d="M4 17l1-4L15 3l3 3L8 16z"/><path d="M13 5l3 3"/><path d="M4 21h16"/>';
+
+const TTD_Q=(()=>{try{const q=new URLSearchParams(location.search).get('ttd')||'';return/^[a-f0-9]{32}$/.test(q)?q:''}catch(e){return''}})();
+const ttdOk=()=>!!U&&(U.peran=='admin'||U.peran=='operasi');
+const ttdBase=()=>window.TTD_BASE||(window.MODE?location.href.split(/[?#]/)[0]:'https://saifulsofyan.github.io/klaim-mw/');
+const ttdUrl=t=>ttdBase()+'?ttd='+t;
+const ttdRp=v=>{const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return String(v).trim()===''||isNaN(n)?'-':'Rp '+n.toLocaleString('id-ID')};
+const ttdRows=d=>[['No Registrasi',d.NoReg],['NIP',d.NIP],['Nama',d.Nama],['Jumlah Point',d.JumlahPoint],['Jumlah Klaim',d.JumlahKlaim],['Biaya Perbaikan',ttdRp(d.Biaya)]].map(([l,v])=>`<div class="tk"><span>${l}</span><b>${esc(v)}</b></div>`).join('')+'<p class="tkn">Jumlah point dan klaim dihitung 6 bulan terakhir.</p>';
+
+// ---- pembuat QR (byte mode, koreksi M, versi 1-10; tanpa pustaka luar) ----
+function qrSvg(text){
+ const u=[...unescape(encodeURIComponent(text))].map(c=>c.charCodeAt(0)),EC=[10,16,26,18,24,16,18,22,22,26],NB=[1,1,1,2,2,4,4,4,5,5];
+ const rawM=v=>{let r=(16*v+128)*v+64;if(v>1){const n=Math.floor(v/7)+2;r-=(25*n-10)*n-55;if(v>6)r-=36}return r};
+ let ver=1;
+ for(;ver<=10;ver++){if(4+(ver<10?8:16)+8*u.length<=8*(Math.floor(rawM(ver)/8)-EC[ver-1]*NB[ver-1]))break}
+ if(ver>10)throw new Error('Teks QR terlalu panjang');
+ const ec=EC[ver-1],nb=NB[ver-1],rawCw=Math.floor(rawM(ver)/8),cap=rawCw-ec*nb,sz=ver*4+17,bits=[];
+ const put=(v,n)=>{for(let i=n-1;i>=0;i--)bits.push((v>>>i)&1)};
+ put(4,4);put(u.length,ver<10?8:16);u.forEach(b=>put(b,8));put(0,Math.min(4,cap*8-bits.length));
+ while(bits.length%8)bits.push(0);
+ for(let p=0xEC;bits.length<cap*8;p^=0xFD)put(p,8);
+ const data=[];for(let i=0;i<bits.length;i+=8)data.push(parseInt(bits.slice(i,i+8).join(''),2));
+ const mul=(x,y)=>{let z=0;for(let i=7;i>=0;i--){z=(z<<1)^((z>>>7)*0x11D);z^=((y>>>i)&1)*x}return z};
+ const dv=[];for(let i=0;i<ec-1;i++)dv.push(0);dv.push(1);
+ for(let i=0,r=1;i<ec;i++){for(let j=0;j<dv.length;j++){dv[j]=mul(dv[j],r);if(j+1<dv.length)dv[j]^=dv[j+1]}r=mul(r,2)}
+ const nShort=nb-rawCw%nb,shortLen=Math.floor(rawCw/nb),blocks=[];
+ for(let i=0,k=0;i<nb;i++){
+  const d=data.slice(k,k+shortLen-ec+(i<nShort?0:1));k+=d.length;
+  const rem=dv.map(()=>0);
+  d.forEach(b=>{const f=b^rem.shift();rem.push(0);dv.forEach((c,j)=>rem[j]^=mul(c,f))});
+  if(i<nShort)d.push(0);blocks.push(d.concat(rem));
+ }
+ const all=[];
+ for(let i=0;i<blocks[0].length;i++)blocks.forEach((b,j)=>{if(i!=shortLen-ec||j>=nShort)all.push(b[i])});
+ const mk=()=>[...Array(sz)].map(()=>Array(sz).fill(false)),m=mk(),fn=mk();
+ const set=(x,y,d)=>{m[y][x]=!!d;fn[y][x]=true},bit=(v,i)=>(v>>>i)&1;
+ for(let i=0;i<sz;i++){set(6,i,i%2==0);set(i,6,i%2==0)}
+ [[3,3],[sz-4,3],[3,sz-4]].forEach(([cx,cy])=>{for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){
+  const d=Math.max(Math.abs(dx),Math.abs(dy)),x=cx+dx,y=cy+dy;if(x>=0&&x<sz&&y>=0&&y<sz)set(x,y,d!=2&&d!=4)}});
+ if(ver>1){
+  const n=Math.floor(ver/7)+2,st=ver==32?26:Math.ceil((ver*4+4)/(n*2-2))*2,pos=[6];
+  for(let p=sz-7;pos.length<n;p-=st)pos.splice(1,0,p);
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+   if((i==0&&j==0)||(i==0&&j==n-1)||(i==n-1&&j==0))continue;
+   for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(pos[i]+dx,pos[j]+dy,Math.max(Math.abs(dx),Math.abs(dy))!=1);
+  }
+ }
+ const fmt=mask=>{
+  let r=mask;for(let i=0;i<10;i++)r=(r<<1)^((r>>>9)*0x537);
+  const b=((mask<<10)|r)^0x5412;
+  for(let i=0;i<=5;i++)set(8,i,bit(b,i));set(8,7,bit(b,6));set(8,8,bit(b,7));set(7,8,bit(b,8));
+  for(let i=9;i<15;i++)set(14-i,8,bit(b,i));
+  for(let i=0;i<8;i++)set(sz-1-i,8,bit(b,i));
+  for(let i=8;i<15;i++)set(8,sz-15+i,bit(b,i));
+  set(8,sz-8,true);
+ };
+ fmt(0);
+ if(ver>=7){
+  let r=ver;for(let i=0;i<12;i++)r=(r<<1)^((r>>>11)*0x1F25);
+  const b=(ver<<12)|r;
+  for(let i=0;i<18;i++){const a=sz-11+i%3,c=Math.floor(i/3);set(a,c,bit(b,i));set(c,a,bit(b,i))}
+ }
+ for(let i=0,right=sz-1;right>=1;right-=2){
+  if(right==6)right=5;
+  for(let v=0;v<sz;v++)for(let j=0;j<2;j++){
+   const x=right-j,y=((right+1)&2)==0?sz-1-v:v;
+   if(!fn[y][x]&&i<all.length*8){m[y][x]=!!bit(all[i>>>3],7-(i&7));i++}
+  }
+ }
+ const cond=[(x,y)=>(x+y)%2==0,(x,y)=>y%2==0,(x,y)=>x%3==0,(x,y)=>(x+y)%3==0,(x,y)=>(Math.floor(x/3)+Math.floor(y/2))%2==0,
+  (x,y)=>x*y%2+x*y%3==0,(x,y)=>(x*y%2+x*y%3)%2==0,(x,y)=>((x+y)%2+x*y%3)%2==0];
+ const build=k=>m.map((row,y)=>row.map((v,x)=>fn[y][x]?v:v!==cond[k](x,y)));
+ const pen=g=>{
+  let s=0;const line=a=>{let run=1;for(let i=1;i<=a.length;i++){if(i<a.length&&a[i]===a[i-1])run++;else{if(run>=5)s+=run-2;run=1}}
+   const t='0000'+a.map(v=>v?1:0).join('')+'0000';for(const p of['00001011101','10111010000']){let k=-1;while((k=t.indexOf(p,k+1))>=0)s+=40}};
+  g.forEach(line);for(let x=0;x<sz;x++)line(g.map(r=>r[x]));
+  for(let y=0;y<sz-1;y++)for(let x=0;x<sz-1;x++)if(g[y][x]===g[y][x+1]&&g[y][x]===g[y+1][x]&&g[y][x]===g[y+1][x+1])s+=3;
+  const d=g.flat().filter(Boolean).length*100/(sz*sz);s+=Math.floor(Math.abs(d-50)/5)*10;return s};
+ let best=0,bg=null,bp=1e9;
+ for(let k=0;k<8;k++){const g=build(k),p=pen(g);if(p<bp){bp=p;best=k;bg=g}}
+ fmt(best);
+ for(let y=0;y<sz;y++)for(let x=0;x<sz;x++)if(fn[y][x])bg[y][x]=m[y][x];
+ const q=4,tot=sz+q*2;let d='';
+ bg.forEach((row,y)=>{for(let x=0;x<sz;){if(row[x]){let e=x;while(e<sz&&row[e])e++;d+=`M${x+q} ${y+q}h${e-x}v1h-${e-x}z`;x=e}else x++}});
+ return`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${tot} ${tot}" shape-rendering="crispEdges" style="width:100%;height:auto;display:block"><rect width="${tot}" height="${tot}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
+
+// ---- sisi Operasi: pilih No Registrasi -> data otomatis + barcode ----
+let TTDT=null,TTDK='';
+async function vTtd(){
+ head({t:'TTD Pengemudi',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
+ if(!ttdOk()){V.innerHTML='<div class="cd">Akun Anda tidak punya akses TTD Pengemudi.</div>';return}
+ const rg=await run('regs','TTD');
+ V.innerHTML=`<div class="bn"><div><h2>TTD PENGEMUDI</h2><p>Pilih No Registrasi, lalu minta pengemudi scan barcode untuk tanda tangan digital.</p></div>${ic('sign',56,'#fff')}</div>
+<div class="cd"><label class="f"><span class="l">No Registrasi</span><select class="in" id="ttdReg" onchange="ttdPick(this.value)"><option value="">Pilih No Registrasi</option>${opt(rg.map(r=>r.v+'|'+r.l))}</select><small>${rg.length?'Hanya nomor yang belum ditandatangani.':'Semua nomor registrasi sudah ditandatangani.'}</small></label><div id="ttdBody"></div></div>`}
+async function ttdRender(){V.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';try{await vTtd()}catch(e){toast(e.message||'Terjadi kesalahan')}}
+async function ttdPick(v){
+ clearInterval(TTDT);TTDK='';const b=$('#ttdBody');if(!b)return;
+ if(!v){b.innerHTML='';return}
+ b.innerHTML='<p style="text-align:center;color:var(--m)">Membuat barcode…</p>';
+ try{
+  const r=await run('ttdLink',v);
+  if(!$('#ttdReg')||$('#ttdReg').value!==v)return;
+  TTDK=r.token;
+  $('#ttdBody').innerHTML=ttdRows(r.data)+`<div class="qr" id="ttdQr">${qrSvg(ttdUrl(r.token))}</div><div class="qs" id="ttdSt">Menunggu pengemudi scan dan tanda tangan…</div><div class="row"><button type="button" class="btn s" onclick="ttdCopy()">Salin Link</button></div>`;
+  TTDT=setInterval(ttdPoll,3000);
+ }catch(e){const x=$('#ttdBody');if(x)x.innerHTML='<div class="qs er">'+esc(e.message||'Gagal membuat barcode')+'</div>'}}
+async function ttdPoll(){
+ if(!$('#ttdSt')||!TTDK){clearInterval(TTDT);return}
+ let s;try{s=await run('ttdStatus',TTDK)}catch(e){return}
+ const el=$('#ttdSt');if(!el)return;
+ if(s=='signed'){
+  clearInterval(TTDT);TTDK='';try{window.MODE&&MODE.stale&&MODE.stale()}catch(e){}
+  $('#ttdQr').style.display='none';el.className='qs ok';el.textContent='TTD pengemudi sudah tersimpan';
+  el.insertAdjacentHTML('afterend','<div class="row"><button type="button" class="btn p" onclick="ttdRender()">TTD Pengemudi Lain</button></div>');
+  const cp=el.parentNode.querySelector('.row .btn.s');if(cp)cp.parentNode.remove();
+ }else if(s=='expired'){
+  clearInterval(TTDT);TTDK='';$('#ttdQr').style.display='none';el.className='qs er';el.textContent='Barcode sudah kedaluwarsa. Pilih ulang No Registrasi untuk membuat barcode baru.'}}
+async function ttdCopy(){try{await navigator.clipboard.writeText(ttdUrl(TTDK));toast('Link disalin')}catch(e){toast('Link tidak bisa disalin')}}
+
+// ---- sisi Pengemudi (dibuka lewat barcode, tanpa login) ----
+let SG={len:0};
+async function ttdPublic(tk){
+ $('header').style.display='none';$('nav').style.display='none';
+ V.innerHTML='<p style="text-align:center;color:var(--m);padding-top:20vh">Memuat data…</p>';
+ let d;try{d=await raw('ttdGet',tk)}catch(e){return ttdMsg(e.message||'Gagal memuat data',/internet|koneksi/i.test(e.message||''))}
+ V.innerHTML=`<div style="text-align:center;padding:18px 0 4px"><div class="lg" style="margin:0 auto 8px;width:56px;height:56px;background:var(--b)">${ic('car',34,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><p style="color:var(--m);margin:2px 0 0;font-size:13px">${esc(S.pool)}</p></div>
+<div class="cd" id="ttdCard">${ttdRows(d)}</div>
+<div class="cd" id="sgCard"><span class="l">Tanda tangan di kotak ini</span><div class="sg"><canvas id="sg"></canvas><span id="sgh">Tanda tangan di sini</span></div><div class="row" style="margin-top:10px"><button type="button" class="btn s" onclick="sgInit()">Hapus</button><button type="button" class="btn p" id="sgOk" onclick="sgSend()" disabled>Simpan</button></div></div>`;
+ sgInit()}
+function ttdMsg(m,retry){
+ V.innerHTML=`<div style="padding-top:14vh;text-align:center"><div class="lg" style="margin:0 auto 12px;width:64px;height:64px;background:var(--b)">${ic('car',40,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><div class="cd" style="text-align:left"><div class="qs er" style="margin:0">${esc(m)}</div>${retry?'<div class="row" style="margin-top:10px"><button type="button" class="btn p" onclick="ttdPublic(TTD_Q)">Coba Lagi</button></div>':''}</div></div>`}
+function sgInit(){
+ const c=$('#sg');if(!c)return;
+ const r=c.getBoundingClientRect(),k=window.devicePixelRatio||1,x=c.getContext('2d');
+ c.width=Math.round(r.width*k);c.height=Math.round(r.height*k);
+ x.setTransform(k,0,0,k,0,0);x.clearRect(0,0,r.width,r.height);x.lineWidth=2.6;x.lineCap='round';x.lineJoin='round';x.strokeStyle=x.fillStyle='#0A1654';
+ SG={c:c,x:x,w:r.width,h:r.height,len:0,on:false,lx:0,ly:0};
+ $('#sgh').style.display='';$('#sgOk').disabled=true;
+ const pt=e=>{const b=c.getBoundingClientRect();return[e.clientX-b.left,e.clientY-b.top]};
+ c.onpointerdown=e=>{e.preventDefault();try{c.setPointerCapture(e.pointerId)}catch(_){}const[a,b]=pt(e);SG.on=true;SG.lx=a;SG.ly=b;x.beginPath();x.arc(a,b,1.3,0,7);x.fill();$('#sgh').style.display='none'};
+ c.onpointermove=e=>{if(!SG.on)return;e.preventDefault();const[a,b]=pt(e);x.beginPath();x.moveTo(SG.lx,SG.ly);x.lineTo(a,b);x.stroke();SG.len+=Math.hypot(a-SG.lx,b-SG.ly);SG.lx=a;SG.ly=b;if(SG.len>60)$('#sgOk').disabled=false};
+ c.onpointerup=c.onpointercancel=()=>{SG.on=false}}
+async function sgSend(){
+ if(SG.len<60)return toast('Tanda tangan belum diisi');
+ const b=$('#sgOk');b.disabled=true;b.textContent='Menyimpan…';
+ const o=document.createElement('canvas'),w=600;o.width=w;o.height=Math.round(w*SG.h/SG.w);
+ const q=o.getContext('2d');q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(SG.c,0,0,o.width,o.height);
+ try{
+  await raw('ttdSubmit',TTD_Q,o.toDataURL('image/png'));
+  $('#sgCard').innerHTML='<div class="qs ok" style="margin:0;font-size:15px">TTD tersimpan. Terima kasih.</div>';
+ }catch(e){
+  const m=e.message||'Gagal menyimpan';
+  if(/kedaluwarsa|sudah tersimpan|sudah ditandatangani|tidak valid/i.test(m))return ttdMsg(m,false);
+  toast(m);b.disabled=false;b.textContent='Simpan'}}
+window.addEventListener('resize',()=>{if($('#sg')&&!SG.len)sgInit()});
+
+// ---- tile "TTD Pengemudi" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
+function ttdTile(){
+ if(P!='dash'||!ttdOk())return;
+ const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
+ if(!op||op.parentNode.querySelector('[data-ttd]'))return;
+ const g=op.parentNode,t=op.cloneNode(true);
+ t.setAttribute('data-ttd','1');t.className=op.className.replace(/\bc\d\b/,'c7');t.setAttribute('onclick',"go('ttd')");
+ const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
+ const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
+ const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
+ if(b)b.textContent='TTD Pengemudi';if(ch)ch.textContent='Operasi';setT(n,'–');
+ const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
+ g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
+ run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})}
+let ttdRaf=0;
+new MutationObserver(()=>{if(ttdRaf)return;ttdRaf=requestAnimationFrame(()=>{ttdRaf=0;try{ttdTile()}catch(e){}})}).observe(V,{childList:true,subtree:true});
+try{const f=go;go=function(p,x){if(p=='ttd'){P='ttd';X='';window.scrollTo(0,0);nv();return ttdRender()}return f.apply(this,arguments)}}catch(e){}
+try{const f=render;render=function(){return P=='ttd'?ttdRender():f.apply(this,arguments)}}catch(e){}
+try{const f=nv;nv=function(){const p=P;if(p=='ttd')P='dash';try{return f.apply(this,arguments)}finally{P=p}}}catch(e){}
+try{const f=showLogin;showLogin=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
+try{const f=start;start=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
+// ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
  TK='';U=null;try{localStorage.removeItem('tk')}catch(e){}
