@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0B5ED7">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<script src="shim.js"></script>
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -69,13 +64,13 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 </div>
 <script>
 const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-const OPT={mobil:['Stiker','Reguler','CNG'],jenis:['TSR','TRR','TBB','TSB','LC','TBT'],est:['1 hari','2 hari','1/2 hari','1/7 hari','2/7 hari'],plan:['2:1','3:1','4:1','6:1'],tindakan:['Stop Operasi','Operasional Kembali'],kat:['R','SR','B','SB','KR','LC','Subkon'],point:['0.5|½','1','1.5','2','2.5','3','5']};
+const OPT={status:['Dalam Proses','Selesai'],tamu:['Ada Tamu','Tidak Ada Tamu'],={mobil:['Stiker','Reguler','CNG'],jenis:['TSR','TRR','TBB','TSB','LC','TBT'],est:['1 hari','2 hari','1/2 hari','1/7 hari','2/7 hari'],plan:['2:1','3:1','4:1','6:1'],tindakan:['Stop Operasi','Operasional Kembali'],kat:['R','SR','B','SB','KR','LC','Subkon'],point:['0.5|½','1','1.5','2','2.5','3','5']};
 const FM={
 Klaim:{t:'Input Klaim',s:'Security - Klaim Kendaraan',i:'shield',c:'#6D28D9',f:[['TglKejadian','Tanggal Kejadian','date','',1],['JenisMobil','Jenis Mobil','sel','mobil',1],['NIP','NIP Pengemudi','text','',1],['Nama','Nama Pengemudi','text','',1],['NoMobil','No Mobil','text','',1],['Jenis','Jenis Kerusakan','sel','jenis',1],['Detail','Detail Kerusakan','area','',1],['WA','Pergantian WA','text'],['Foto','Foto Kerusakan','foto','',1],['Petugas','NIP & Nama Petugas','sel','petugas',1],['Lokasi','Lokasi Kejadian','text','',1],['LawanTabrak','Lawan Tabrak','text']]},
-Bengkel:{t:'Input Bengkel',s:'Bengkel - Klaim Kendaraan',i:'wrench',c:'#1D4ED8',f:[['Status','Status Pengerjaan','sel','status',1],['Biaya','Estimasi Biaya (Rp)','num','',1],['TglSelesai','Tanggal Selesai Perbaikan','date','',1],['FotoSelesai','Foto Selesai Perbaikan','foto','',1],['Rincian','Capture Rincian Klaim (Data DPF)','foto','',1],['EstPerbaikan','Estimasi Perbaikan','sel','est',1]]},
-PU:{t:'Input PU',s:'PU - Klaim Kendaraan',i:'clip',c:'#15803D',f:[['Kategori','Kategori','sel','kat',1],['Point','Point','sel','point',1],['pa','Total Point Aktif','calc'],['Dedaan','Dedaan (Rp.)','num','',1]]},
+Bengkel:{t:'Input Bengkel',s:'Bengkel - Klaim Kendaraan',i:'wrench',c:'#1D4ED8',f:[['Status','Status Pengerjaan','sel','status',1],['Biaya','Estimasi Biaya (Rp)','num','',1],['TglSelesai','Tanggal Selesai Perbaikan','date','',1],['FotoSelesai','Foto Selesai Perbaikan','foto','',1],['Rincian','Capture Rincian Klaim (Data DPF)','foto','',1],['EstPerbaikan','Estimasi Perbaikan','sel','est',1],['Petugas','NIP & Nama Petugas','sel','petugasBengkel',1]]},
+PU:{t:'Input PU',s:'PU - Klaim Kendaraan',i:'clip',c:'#15803D',f:[['Kategori','Kategori','sel','kat',1],['Point','Point','sel','point',1],['pa','Total Point Aktif','calc'],['Dedaan','Dedaan (Rp.)','num','',1],['Petugas','NIP & Nama Petugas','sel','petugasPU',1]]},
 Operasi:{t:'Input Operasi',s:'Operasi - Klaim Kendaraan',i:'clip',c:'#B45309',f:[['Situasi','Situasi Kejadian','area','',1],['Waktu','Waktu Kejadian (jam)','time','',1],['Tamu','Tamu','sel','tamu',1],['JenisMobil','Jenis Mobil','sel','mobil',1],['Planning','Planning','sel','plan',1],['HariKerja','Hari Kerja','num','',1],['Tindakan','Tindakan kepada Pengemudi','sel','tindakan',1],['Petugas','NIP Petugas Operasi','sel','petugasOps',1]]}};
-const SF=[['pool','Nama Pool','text'],['kepala','Kepala Bengkel','text'],['petugas','Petugas Security (NIP - Nama, satu per baris)','area'],['petugasOps','Petugas Operasi (NIP - Nama, satu per baris)','area'],['tamu','Opsi Status Tamu (satu per baris)','area'],['status','Opsi Status Pengerjaan (satu per baris)','area']];
+const SF=[['pool','Nama Pool','text'],['kepala','Kepala Bengkel','text'],['petugas','Petugas Security (NIP - Nama, satu per baris)','area'],['petugasOps','Petugas Operasi (NIP - Nama, satu per baris)','area'],['petugasBengkel','Petugas Bengkel (NIP - Nama, satu per baris)','area'],['petugasPU','Petugas PU (NIP - Nama, satu per baris)','area']];
 const NM={Klaim:'Klaim',Bengkel:'Bengkel',PU:'PU',Operasi:'Operasi',Frek:'Frekuensi Pengemudi'};
 const IC={menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',home:'<path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z"/>',file:'<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/>',plus:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',gear:'<circle cx="12" cy="12" r="7" stroke-width="4" stroke-dasharray="3.2 2.2"/><circle cx="12" cy="12" r="3"/>',shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 5-5"/>',wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',clip:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h6"/>',cal:'<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/>',chevr:'<path d="M9 6l6 6-6 6"/>',users:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/>',car:'<path d="M5 16v-4l2-5h10l2 5v4zM5 16v3h3v-3M16 16v3h3v-3M7 12h10"/>',search:'<circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/>',pencil:'<path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/>',save:'<path d="M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7"/>',upload:'<path d="M7 18a4 4 0 0 1-1-7.9A6 6 0 0 1 17.7 9 4.5 4.5 0 0 1 17 18zM12 16v-6M9 12l3-3 3 3"/>'};
 
