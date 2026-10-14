@@ -1,5 +1,5 @@
 // Service worker: menyimpan tampilan aplikasi di HP supaya bisa dibuka tanpa internet
-const C = 'klaim-mw-v4';
+const C = 'klaim-mw-v5';
 const SHELL = ['./', 'index.html', 'manifest.json', 'shim.js', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -13,7 +13,8 @@ self.addEventListener('fetch', e => {
   if (u.origin !== location.origin && !/(googleapis|gstatic)\.com$/.test(u.hostname)) return;
   e.respondWith((async () => {
     const c = await caches.open(C), hit = await c.match(r, {ignoreSearch: true});
-    const net = fetch(r).then(res => { if (res.ok || res.type === 'opaque') c.put(r, res.clone()); return res; }).catch(() => null);
+    const key = u.searchParams.has('ttd') ? u.origin + u.pathname : r;  // barcode TTD: jangan simpan token di cache
+    const net = fetch(r).then(res => { if (res.ok || res.type === 'opaque') c.put(key, res.clone()); return res; }).catch(() => null);
     if (hit) { e.waitUntil(net); return hit; }
     return (await net) || (r.mode === 'navigate' ? await c.match('./') : Response.error());
   })());
