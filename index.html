@@ -505,7 +505,26 @@ try{const f=saveLC;saveLC=function(){const el=$('#lcForm [name="EstLama"]');
 // ---- Nomor MO (Input LC): diisi manual, tidak wajib, tampil di bawah Nomor Mobil ----
 try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',0])}}catch(e){}
 new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (tidak wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
-
+// ---- Estimasi: angka 0 boleh (mengganti aturan lama; fungsi estOk yang terakhir dipakai) ----
+function estOk(v){
+ v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
+ if(/^(0|[1-9]\d*)$/.test(v))return v;
+ if((m=/^[1-9]\d* ([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
+ if((m=/^([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
+ return null}
+// petunjuk di bawah kolom estimasi ikut menyebut angka 0
+new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.textContent;if(x.indexOf('Tulis angka saja')==0&&x.indexOf('Contoh: 0')<0)s.textContent=x.replace('Contoh: 2 ·','Contoh: 0 · 2 ·')})}).observe(V,{childList:true,subtree:true});
+// ---- HURUF BESAR otomatis: Nama Pengemudi + No Mobil (Input Klaim), Nomor Mobil (Input LC) ----
+(function(){
+ const Q='#dataForm [name="Nama"],#dataForm [name="NoMobil"],#lcForm [name="NoMobil"]';
+ const up=t=>{if(!t||t.tagName!='INPUT'||!t.matches||!t.matches(Q))return;const u=t.value.toUpperCase();if(u===t.value)return;const a=t.selectionStart,b=t.selectionEnd;t.value=u;try{t.setSelectionRange(a,b)}catch(x){}};
+ document.addEventListener('input',e=>{if(!e.isComposing)up(e.target)});
+ document.addEventListener('compositionend',e=>up(e.target));
+ new MutationObserver(()=>{V.querySelectorAll(Q).forEach(t=>{if(t.tagName!='INPUT'||t.dataset.up)return;t.dataset.up='1';t.setAttribute('autocapitalize','characters');t.setAttribute('autocorrect','off');t.setAttribute('spellcheck','false');t.style.textTransform='uppercase'})}).observe(V,{childList:true,subtree:true});
+ const all=()=>V.querySelectorAll(Q).forEach(t=>{if(t.tagName=='INPUT')t.value=t.value.toUpperCase()});
+ try{const f=save;save=function(){all();return f.apply(this,arguments)}}catch(e){}
+ try{const f=saveLC;saveLC=function(){all();return f.apply(this,arguments)}}catch(e){}
+})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
