@@ -494,6 +494,16 @@ try{const f=save;save=function(){
   if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi Perbaikan hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}}
  return f.apply(this,arguments)}}catch(e){}
  try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}
+ // ---- Estimasi Lama (Input LC): sama seperti Estimasi Perbaikan di Input Bengkel ----
+try{const f=fld;fld=function(a){if(a&&a[0]=='EstLama'&&a[2]=='sel')a=[a[0],a[1],'text','',a[4]];return f.call(this,a)}}catch(e){}
+new MutationObserver(()=>{const el=$('#lcForm [name="EstLama"]');if(!el||el.tagName!='INPUT'||el.dataset.est)return;el.dataset.est='1';el.setAttribute('placeholder','Contoh: 2   1/2   2/7   2 1/7');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','12');el.insertAdjacentHTML('afterend','<small>Tulis angka saja, tanpa huruf. Contoh: 2 · 1/2 · 2/7 · 2 1/7. Angka dan pecahan dipisah spasi.</small>')}).observe(V,{childList:true,subtree:true});
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.name=='EstLama'&&t.tagName=='INPUT'){const v=t.value.replace(/[^0-9\/ ]/g,'').replace(/ {2,}/g,' ');if(v!==t.value)t.value=v}});
+try{const f=saveLC;saveLC=function(){const el=$('#lcForm [name="EstLama"]');
+ if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}
+ return f.apply(this,arguments)}}catch(e){}
+ // ---- Nomor MO (Input LC): diisi manual, tidak wajib, tampil di bawah Nomor Mobil ----
+try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',0])}}catch(e){}
+new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (tidak wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
