@@ -32,7 +32,7 @@
 
   // Data ringkasan (dashboard, laporan, frekuensi) boleh diambil dari salinan di HP saat mode Offline.
   // Salinan dianggap basi setelah 10 menit atau setelah ada input baru, lalu diambil ulang dari server.
-  const SUMMARY = ['dashboard', 'lcSummary', 'frekuensi', 'report'], TTL = 600000;
+  const SUMMARY = ['dashboard', 'lcSummary', 'frekuensi', 'report', 'ttdSummary'], TTL = 600000;
   const cacheFresh = async k => { const c = (await kv('get', 'cache')) || {}; return c[k] !== undefined && Date.now() - (c['@t:' + k] || 0) < TTL ? c[k] : undefined; };
   async function stale() {
     const c = (await kv('get', 'cache')) || {};
@@ -44,6 +44,7 @@
   const isOff = () => { try { return localStorage.getItem('mode') == 'off'; } catch (e) { return false; } };
   window.MODE = {
     off: isOff,
+    stale: stale,
     set(v) {  // v = true -> offline
       try { localStorage.setItem('mode', v ? 'off' : 'on'); } catch (e) {}
       badge();
@@ -171,7 +172,7 @@
     if (!tk || !navigator.onLine || isOff() || Date.now() - lastWarm < 300000) return;
     lastWarm = Date.now();
     const d = new Date(), m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]]];
+    const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]], ['ttdSummary', [m]]];
     for (const [f, a] of list) await read([tk, f, a]).catch(() => {});
   }
 
@@ -195,7 +196,10 @@
 
   // ---------- pengganti google.script.run ----------
   async function call(fn, a) {
-    if (fn == 'api') return WRITE.indexOf(a[1]) >= 0 ? write(a) : read(a);
+    if (fn == 'api') {
+      if (/^ttd/.test(a[1])) return rpc(fn, a);  // TTD pengemudi: selalu ke server, tidak disimpan di HP
+      return WRITE.indexOf(a[1]) >= 0 ? write(a) : read(a);
+    }
     if (fn == 'session') {
       try { const r = await rpc(fn, a); kv('set', 'session', r); return r; }
       catch (e) { if (e instanceof NetErr) { const s = await kv('get', 'session'); if (s) return s; } throw e; }
