@@ -302,7 +302,7 @@ const ttdOk=()=>!!U&&(U.peran=='admin'||U.peran=='operasi');
 const ttdBase=()=>window.TTD_BASE||(window.MODE?location.href.split(/[?#]/)[0]:'https://saifulsofyan.github.io/klaim-mw/');
 const ttdUrl=t=>ttdBase()+'?ttd='+t;
 const ttdRp=v=>{const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return String(v).trim()===''||isNaN(n)?'-':'Rp '+n.toLocaleString('id-ID')};
-const ttdRows=d=>[['No Registrasi',d.NoReg],['NIP',d.NIP],['Nama',d.Nama],['Jumlah Point',d.JumlahPoint],['Jumlah Klaim',d.JumlahKlaim],['Biaya Perbaikan',ttdRp(d.Biaya)]].map(([l,v])=>`<div class="tk"><span>${l}</span><b>${esc(v)}</b></div>`).join('')+'<p class="tkn">Jumlah point dan klaim dihitung 6 bulan terakhir.</p>';
+const ttdRows=d=>[['No Registrasi',d.NoReg],['NIP',d.NIP],['Nama',d.Nama],['Jumlah Point',d.JumlahPoint],['Jumlah Klaim',d.JumlahKlaim],['Biaya Perbaikan',ttdRp(d.Biaya)]].map(([l,v])=>`<div class="tk"><span>${l}</span><b>${esc(v===''||v==null?'-':v)}</b></div>`).join('')+'<p class="tkn">Jumlah point dan klaim dihitung 6 bulan terakhir.</p>';
 
 // ---- pembuat QR (byte mode, koreksi M, versi 1-10; tanpa pustaka luar) ----
 function qrSvg(text){
@@ -397,6 +397,9 @@ async function ttdPick(v){
  try{
   const r=await run('ttdLink',v);
   if(!$('#ttdReg')||$('#ttdReg').value!==v)return;
+  if(r.kurang&&r.kurang.length){  // data belum lengkap: tampilkan peringatan, barcode tidak dibuat
+   $('#ttdBody').innerHTML=ttdRows(r.data)+`<div class="qs er" style="text-align:left;line-height:1.6"><b>Data belum dilengkapi dari PU</b><br>${r.kurang.map(x=>'• '+esc(x)).join('<br>')}<br>Barcode belum bisa ditampilkan.</div><div class="row"><button type="button" class="btn s" onclick="ttdPick($('#ttdReg').value)">Cek Lagi</button></div>`;
+   return}
   TTDK=r.token;
   $('#ttdBody').innerHTML=ttdRows(r.data)+`<div class="qr" id="ttdQr">${qrSvg(ttdUrl(r.token))}</div><div class="qs" id="ttdSt">Menunggu pengemudi scan dan tanda tangan…</div><div class="row"><button type="button" class="btn s" onclick="ttdCopy()">Salin Link</button></div>`;
   TTDT=setInterval(ttdPoll,3000);
@@ -466,12 +469,31 @@ function ttdTile(){
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})}
 let ttdRaf=0;
-new MutationObserver(()=>{if(ttdRaf)return;ttdRaf=requestAnimationFrame(()=>{ttdRaf=0;try{ttdTile()}catch(e){}})}).observe(V,{childList:true,subtree:true});
+new MutationObserver(()=>{if(ttdRaf)return;ttdRaf=requestAnimationFrame(()=>{ttdRaf=0;try{ttdTile()}catch(e){}try{estFix()}catch(e){}})}).observe(V,{childList:true,subtree:true});
 try{const f=go;go=function(p,x){if(p=='ttd'){P='ttd';X='';window.scrollTo(0,0);nv();return ttdRender()}return f.apply(this,arguments)}}catch(e){}
 try{const f=render;render=function(){return P=='ttd'?ttdRender():f.apply(this,arguments)}}catch(e){}
 try{const f=nv;nv=function(){const p=P;if(p=='ttd')P='dash';try{return f.apply(this,arguments)}finally{P=p}}}catch(e){}
 try{const f=showLogin;showLogin=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
 try{const f=start;start=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
+// ---- Estimasi Perbaikan (Input Bengkel): tulis angka bebas, contoh 2 | 1/2 | 2/7 | 2 1/7 ----
+try{const f=FM.Bengkel.f.find(x=>x[0]=='EstPerbaikan');if(f){f[2]='text';f[3]=''}}catch(e){}
+function estOk(v){
+ v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
+ if(/^[1-9]\d*$/.test(v))return v;
+ if((m=/^[1-9]\d* ([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
+ if((m=/^([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
+ return null}
+function estFix(){
+ const el=V.querySelector('[name="EstPerbaikan"]');
+ if(!el||el.tagName!='INPUT'||el.dataset.est)return;
+ el.dataset.est='1';el.setAttribute('placeholder','Contoh: 2   1/2   2/7   2 1/7');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','12');
+ el.insertAdjacentHTML('afterend','<small>Tulis angka saja, tanpa huruf. Contoh: 2 · 1/2 · 2/7 · 2 1/7. Angka dan pecahan dipisah spasi.</small>')}
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.name=='EstPerbaikan'&&t.tagName=='INPUT'){const v=t.value.replace(/[^0-9\/ ]/g,'').replace(/ {2,}/g,' ');if(v!==t.value)t.value=v}});
+try{const f=save;save=function(){
+ if(X=='Bengkel'){const el=$('#dataForm [name="EstPerbaikan"]');
+  if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi Perbaikan hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}}
+ return f.apply(this,arguments)}}catch(e){}
+ try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
