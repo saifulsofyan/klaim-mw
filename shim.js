@@ -28,7 +28,17 @@
     });
   };
   const cacheGet = async k => ((await kv('get', 'cache')) || {})[k];
-  const cacheSet = async (k, v) => { const c = (await kv('get', 'cache')) || {}; c[k] = v; await kv('set', 'cache', c); };
+  const cacheSet = async (k, v) => { const c = (await kv('get', 'cache')) || {}; c[k] = v; c['@t:' + k] = Date.now(); await kv('set', 'cache', c); };
+
+  // Data ringkasan (dashboard, laporan, frekuensi) boleh diambil dari salinan di HP saat mode Offline.
+  // Salinan dianggap basi setelah 10 menit atau setelah ada input baru, lalu diambil ulang dari server.
+  const SUMMARY = ['dashboard', 'lcSummary', 'frekuensi', 'report'], TTL = 600000;
+  const cacheFresh = async k => { const c = (await kv('get', 'cache')) || {}; return c[k] !== undefined && Date.now() - (c['@t:' + k] || 0) < TTL ? c[k] : undefined; };
+  async function stale() {
+    const c = (await kv('get', 'cache')) || {};
+    Object.keys(c).forEach(k => { if (k.indexOf('@t:') == 0 && SUMMARY.indexOf(k.slice(3).split(':')[0]) >= 0) delete c[k]; });
+    await kv('set', 'cache', c);
+  }
 
   // ---------- saklar Online / Offline (dipilih petugas di header) ----------
   const isOff = () => { try { return localStorage.getItem('mode') == 'off'; } catch (e) { return false; } };
@@ -37,14 +47,13 @@
     set(v) {  // v = true -> offline
       try { localStorage.setItem('mode', v ? 'off' : 'on'); } catch (e) {}
       badge();
-      if (!v) flush().then(warm);
+      flush().then(warm);
     }
   };
 
   // ---------- panggilan ke server ----------
   class NetErr extends Error {}
-  async function rpc(fn, args, force) {
-    if (isOff() && !force) throw new NetErr('Mode offline aktif');  // tidak menghubungi server sama sekali
+  async function rpc(fn, args) {
     let res;
     try { res = await fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: fn, args: args})}); }
     catch (e) { throw new NetErr('Tidak ada koneksi internet'); }
@@ -57,6 +66,10 @@
   // ---------- baca data: online -> simpan salinan, offline -> pakai salinan ----------
   async function read(args) {
     const f = args[1], a = args[2], key = f + ':' + JSON.stringify(a);
+    if (isOff() && SUMMARY.indexOf(f) >= 0) {  // mode Offline: ringkasan dari salinan di HP, tanpa membebani server
+      const c = await cacheFresh(key);
+      if (c !== undefined) return c;
+    }
     try {
       const r = await rpc('api', args);
       cacheSet(key, r);
@@ -83,7 +96,11 @@
     await flush();
     const q0 = (await kv('get', 'queue')) || [];
     if (!q0.length) {
-      try { return await rpc('api', args); } catch (e) { if (!(e instanceof NetErr)) throw e; }
+      try {  // langsung ke Google Sheet (juga saat mode Offline)
+        const r = await rpc('api', args);
+        if (args[1] == 'save') await stale();  // dashboard & laporan diambil ulang agar angkanya berubah
+        return r;
+      } catch (e) { if (!(e instanceof NetErr)) throw e; }
     }
     const f = args[1], a = args[2];
     if (f == 'uploadFoto') {  // foto disimpan di HP dulu, diberi nama sementara
@@ -100,7 +117,7 @@
 
   // ---------- kirim antrean ke server ----------
   async function flush() {
-    if (busy || !navigator.onLine || isOff()) return;
+    if (busy || !navigator.onLine) return;
     busy = true;
     let synced = false;
     try {
@@ -141,7 +158,10 @@
         }
       }
     } finally { busy = false; }
-    if (synced && typeof render == 'function' && typeof P != 'undefined' && P == 'dash') render();
+    if (synced) {
+      await stale();
+      if (typeof render == 'function' && typeof P != 'undefined' && P == 'dash') render();
+    }
   }
 
   // ---------- siapkan data untuk offline (dimuat saat online) ----------
@@ -181,12 +201,12 @@
       catch (e) { if (e instanceof NetErr) { const s = await kv('get', 'session'); if (s) return s; } throw e; }
     }
     if (fn == 'login') {
-      const r = await rpc(fn, a, true);  // login selalu ke server, walau mode offline
+      const r = await rpc(fn, a);
       kv('set', 'session', {username: r.username, nama: r.nama, peran: r.peran});
       setTimeout(() => flush().then(warm), 1500);
       return r;
     }
-    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); return rpc(fn, a, true).catch(() => true); }
+    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); return rpc(fn, a).catch(() => true); }
     return rpc(fn, a);
   }
   const mk = (ok, no) => new Proxy({}, {get: (t, p) => {
