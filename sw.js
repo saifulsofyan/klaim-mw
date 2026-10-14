@@ -1,5 +1,5 @@
 // Service worker: menyimpan tampilan aplikasi di HP supaya bisa dibuka tanpa internet
-const C = 'klaim-mw-v3';
+const C = 'klaim-mw-v4';
 const SHELL = ['./', 'index.html', 'manifest.json', 'shim.js', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
