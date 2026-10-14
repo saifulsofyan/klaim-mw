@@ -285,7 +285,7 @@ async function saveLC(){
   setTimeout(()=>go('dash'),800)
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
- // ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
+// ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
 (function(){const s=document.createElement('style');s.textContent=`
 .dg{gap:4px}.dg .tl{padding:8px 1px 6px}.dg .tl .n{font-size:28px}.dg .tl b{font-size:10px}.dg .tl .u{font-size:10px}.dg .ch{font-size:10px;width:94%}
 .tk{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--ln);font-size:13.5px}.tk:last-of-type{border-bottom:0}.tk span{color:var(--m)}.tk b{text-align:right;word-break:break-word}
@@ -479,7 +479,7 @@ try{const f=start;start=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,ar
 try{const f=FM.Bengkel.f.find(x=>x[0]=='EstPerbaikan');if(f){f[2]='text';f[3]=''}}catch(e){}
 function estOk(v){
  v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
- if(/^[1-9]\d*$/.test(v))return v;
+ if(/^(0|[1-9]\d*)$/.test(v))return v;
  if((m=/^[1-9]\d* ([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
  if((m=/^([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
  return null}
@@ -493,17 +493,19 @@ try{const f=save;save=function(){
  if(X=='Bengkel'){const el=$('#dataForm [name="EstPerbaikan"]');
   if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi Perbaikan hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}}
  return f.apply(this,arguments)}}catch(e){}
- try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}
- // ---- Estimasi Lama (Input LC): sama seperti Estimasi Perbaikan di Input Bengkel ----
+// ---- Pilihan Point (Input PU) ----
+try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}  // pilihan Point di Input PU (nilai angka, tampilan pecahan)
+// ---- Estimasi Lama (Input LC): sama seperti Estimasi Perbaikan di Input Bengkel ----
 try{const f=fld;fld=function(a){if(a&&a[0]=='EstLama'&&a[2]=='sel')a=[a[0],a[1],'text','',a[4]];return f.call(this,a)}}catch(e){}
 new MutationObserver(()=>{const el=$('#lcForm [name="EstLama"]');if(!el||el.tagName!='INPUT'||el.dataset.est)return;el.dataset.est='1';el.setAttribute('placeholder','Contoh: 2   1/2   2/7   2 1/7');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','12');el.insertAdjacentHTML('afterend','<small>Tulis angka saja, tanpa huruf. Contoh: 2 · 1/2 · 2/7 · 2 1/7. Angka dan pecahan dipisah spasi.</small>')}).observe(V,{childList:true,subtree:true});
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.name=='EstLama'&&t.tagName=='INPUT'){const v=t.value.replace(/[^0-9\/ ]/g,'').replace(/ {2,}/g,' ');if(v!==t.value)t.value=v}});
 try{const f=saveLC;saveLC=function(){const el=$('#lcForm [name="EstLama"]');
  if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}
  return f.apply(this,arguments)}}catch(e){}
- // ---- Nomor MO (Input LC): diisi manual, tidak wajib, tampil di bawah Nomor Mobil ----
+// ---- Nomor MO (Input LC): diisi manual, tidak wajib, tampil di bawah Nomor Mobil ----
 try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',0])}}catch(e){}
 new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (tidak wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
+
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
