@@ -47,6 +47,7 @@
     Object.keys(c).forEach(k => { if (k.indexOf('@t:') == 0 && SUMMARY.indexOf(k.slice(3).split(':')[0]) >= 0) delete c[k]; });
     HOT = {};
     await kv('set', 'cache', c);
+    if (!isOff()) setTimeout(refreshDash, 300);  // ambil angka dashboard terbaru di belakang layar, supaya saat kembali ke dashboard sudah siap
   }
 
   // ---------- saklar Online / Offline (dipilih petugas di header) ----------
@@ -94,6 +95,37 @@
     cacheSetMany(pairs);
     return r.list;
   }
+  // Dashboard: tampilkan angka yang tersimpan di HP SEKETIKA, ambil yang terbaru di belakang layar, lalu segarkan layar bila berubah
+  const SWR = ['dashboard', 'lcSummary', 'ttdSummary'], BG = {};
+  function repaint(f) {
+    try {
+      if (SWR.indexOf(f) < 0 || typeof P == 'undefined' || P != 'dash') return;
+      const fn = window.vDash;
+      if (typeof fn == 'function') Promise.resolve(fn()).catch(() => {}); else if (typeof render == 'function') render();
+    } catch (e) {}
+  }
+  async function bgRefresh(args, key, old) {
+    if (BG[key]) return;
+    BG[key] = 1;
+    try {
+      const r = await rpc('api', args);
+      await cacheSet(key, r);
+      if (JSON.stringify(r) !== JSON.stringify(old)) repaint(args[1]);
+    } catch (e) {} finally { delete BG[key]; }
+  }
+  async function refreshDash() {
+    if (!navigator.onLine) return;
+    let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
+    if (!tk) return;
+    const c = (await kv('get', 'cache')) || {};
+    Object.keys(c).forEach(k => {
+      if (k.indexOf('@t:') == 0) return;
+      const f = k.split(':')[0];
+      if (SWR.indexOf(f) < 0) return;
+      let a; try { a = JSON.parse(k.slice(f.length + 1)); } catch (e) { return; }
+      bgRefresh([tk, f, a], k, c[k]);
+    });
+  }
   // Pengaturan jarang berubah: tampilkan salinan di HP seketika, perbarui di belakang layar
   let setAt = 0;
   async function refreshSettings(args, key) {
@@ -110,6 +142,14 @@
     const hot = hotTake(key);
     if (hot) { try { return await hot; } catch (e) {} }
     if (f == 'getSettings') { const hit = await cacheGet(key); if (hit !== undefined) { refreshSettings(args, key); return hit; } }
+    if (SWR.indexOf(f) >= 0) {
+      const c = (await kv('get', 'cache')) || {}, t = c['@t:' + key];
+      if (c[key] !== undefined) {
+        if (isOff() && t && Date.now() - t < TTL) return c[key];  // mode Offline: salinan < 10 menit dipakai apa adanya
+        if (!t || Date.now() - t >= 15000) bgRefresh(args, key, c[key]);
+        return c[key];
+      }
+    }
     if (isOff() && SUMMARY.indexOf(f) >= 0) {  // mode Offline: ringkasan dari salinan di HP, tanpa membebani server
       const c = await cacheFresh(key);
       if (c !== undefined) return c;
@@ -263,7 +303,7 @@
   // ---------- pengganti google.script.run ----------
   async function call(fn, a) {
     if (fn == 'api') {
-      if (/^ttd/.test(a[1])) return rpc(fn, a);  // TTD pengemudi: selalu ke server, tidak disimpan di HP
+      if (/^ttd(Link|Status)$/.test(a[1])) return rpc(fn, a);  // TTD pengemudi (barcode & status): selalu ke server, tidak disimpan di HP
       return WRITE.indexOf(a[1]) >= 0 ? write(a) : read(a);
     }
     if (fn == 'session') {
