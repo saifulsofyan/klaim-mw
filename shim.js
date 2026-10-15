@@ -29,6 +29,14 @@
   };
   const cacheGet = async k => ((await kv('get', 'cache')) || {})[k];
   const cacheSet = async (k, v) => { const c = (await kv('get', 'cache')) || {}; c[k] = v; c['@t:' + k] = Date.now(); await kv('set', 'cache', c); };
+  const cacheSetMany = async pairs => { const c = (await kv('get', 'cache')) || {}, t = Date.now(); pairs.forEach(([k, v]) => { c[k] = v; c['@t:' + k] = t; }); await kv('set', 'cache', c); };
+  const cacheDel = async k => { const c = (await kv('get', 'cache')) || {}; delete c[k]; delete c['@t:' + k]; await kv('set', 'cache', c); };
+
+  // Data awal form yang sudah dibawa panggilan sebelumnya (sekali pakai, berlaku 20 detik) -> form terbuka tanpa menunggu server lagi
+  let HOT = {};
+  const HOT_MS = 20000;
+  const hotPut = (k, p) => { HOT[k] = {t: Date.now(), p: p}; };
+  const hotTake = k => { const e = HOT[k]; if (!e) return null; delete HOT[k]; return Date.now() - e.t < HOT_MS ? e.p : null; };
 
   // Data ringkasan (dashboard, laporan, frekuensi) boleh diambil dari salinan di HP saat mode Offline.
   // Salinan dianggap basi setelah 10 menit atau setelah ada input baru, lalu diambil ulang dari server.
@@ -37,6 +45,7 @@
   async function stale() {
     const c = (await kv('get', 'cache')) || {};
     Object.keys(c).forEach(k => { if (k.indexOf('@t:') == 0 && SUMMARY.indexOf(k.slice(3).split(':')[0]) >= 0) delete c[k]; });
+    HOT = {};
     await kv('set', 'cache', c);
   }
 
@@ -65,14 +74,50 @@
   }
 
   // ---------- baca data: online -> simpan salinan, offline -> pakai salinan ----------
-  async function read(args) {
+  // Buka form = SATU panggilan: daftar nomor + data awal yang pasti diminta form itu (nomor baru / data nomor pertama / point)
+  async function regsBundle(args) {
+    const form = typeof P != 'undefined' && P == 'form' && typeof X != 'undefined' ? X : '';
+    if (['Klaim', 'Bengkel', 'PU', 'Operasi'].indexOf(form) < 0) return undefined;
+    const a = args[2] || [];
+    let r;
+    try { r = await rpc('api', [args[0], 'regsPlus', [a[0], form]]); }
+    catch (e) { if (e instanceof NetErr) throw e; return undefined; }  // Code.gs lama / galat lain: pakai cara biasa
+    if (!r || !Array.isArray(r.list)) return undefined;
+    const pairs = [['regs:' + JSON.stringify(a), r.list]];
+    const seed = (f, aa, v) => { const k = f + ':' + JSON.stringify(aa); pairs.push([k, v]); hotPut(k, Promise.resolve(v)); };
+    if (r.next !== undefined) seed('nextReg', [], r.next);
+    if (r.list.length) {
+      const v0 = r.list[0].v;
+      if (r.rec !== undefined) seed('getRecord', [form, v0], r.rec);
+      if (r.poin !== undefined) seed('poinAktif', [v0], r.poin);
+    }
+    cacheSetMany(pairs);
+    return r.list;
+  }
+  // Pengaturan jarang berubah: tampilkan salinan di HP seketika, perbarui di belakang layar
+  let setAt = 0;
+  async function refreshSettings(args, key) {
+    if (Date.now() - setAt < 30000) return;
+    setAt = Date.now();
+    try {
+      const r = await rpc('api', args);
+      await cacheSet(key, r);
+      try { if (typeof S != 'undefined' && JSON.stringify(S) != JSON.stringify(r)) S = r; } catch (e) {}
+    } catch (e) {}
+  }
+  async function read(args, nobundle) {
     const f = args[1], a = args[2], key = f + ':' + JSON.stringify(a);
+    const hot = hotTake(key);
+    if (hot) { try { return await hot; } catch (e) {} }
+    if (f == 'getSettings') { const hit = await cacheGet(key); if (hit !== undefined) { refreshSettings(args, key); return hit; } }
     if (isOff() && SUMMARY.indexOf(f) >= 0) {  // mode Offline: ringkasan dari salinan di HP, tanpa membebani server
       const c = await cacheFresh(key);
       if (c !== undefined) return c;
     }
     try {
+      if (f == 'regs' && !nobundle) { const b = await regsBundle(args); if (b !== undefined) return b; }
       const r = await rpc('api', args);
+      if (f == 'saveSettings') await cacheDel('getSettings:[]');  // setelah pengaturan diubah, ambil yang baru dari server
       cacheSet(key, r);
       return r;
     } catch (e) {
@@ -92,13 +137,34 @@
     }
   }
 
+  // ---------- foto: diunggah di latar begitu dipilih, jadi saat Simpan tinggal menunggu data ----------
+  const UP = new WeakMap();
+  const upOne = (tk, it) => rpc('api', [tk, 'uploadFoto', [[{data: it.data, name: it.name}]]]).then(r => r[0]);
+  function preUp(it) {
+    if (!it || typeof it != 'object' || !it.data || UP.has(it) || isOff() || !navigator.onLine) return;
+    let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
+    if (!tk) return;
+    const p = (async () => { if (((await kv('get', 'queue')) || []).length) throw new Error('antrean'); return upOne(tk, it); })();
+    UP.set(it, p);
+    p.catch(() => { if (UP.get(it) === p) UP.delete(it); });
+  }
+  const uploadAll = args => Promise.all((args[2][0] || []).map(it => { const p = UP.get(it), again = () => upOne(args[0], it); return p ? p.catch(again) : again(); }));
+  function hookPh() {
+    try {
+      const f = window.drawPh;
+      if (typeof f != 'function' || f.__pre) return;
+      const g = function (k) { const r = f.apply(this, arguments); try { (PH[k] || []).forEach(preUp); } catch (e) {} return r; };
+      g.__pre = 1; window.drawPh = g;
+    } catch (e) {}
+  }
+
   // ---------- simpan data: online -> langsung, offline -> antrean ----------
   async function write(args) {
     await flush();
     const q0 = (await kv('get', 'queue')) || [];
     if (!q0.length) {
       try {  // langsung ke Google Sheet (juga saat mode Offline)
-        const r = await rpc('api', args);
+        const r = args[1] == 'uploadFoto' ? await uploadAll(args) : await rpc('api', args);
         if (args[1] == 'save') await stale();  // dashboard & laporan diambil ulang agar angkanya berubah
         return r;
       } catch (e) { if (!(e instanceof NetErr)) throw e; }
@@ -173,7 +239,7 @@
     lastWarm = Date.now();
     const d = new Date(), m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]], ['ttdSummary', [m]]];
-    for (const [f, a] of list) await read([tk, f, a]).catch(() => {});
+    for (const [f, a] of list) await read([tk, f, a], true).catch(() => {});
   }
 
   // ---------- penanda di layar ----------
@@ -226,6 +292,6 @@
   window.addEventListener('online', () => { badge(); flush().then(warm); });
   window.addEventListener('offline', badge);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) flush().then(warm); });
-  document.addEventListener('DOMContentLoaded', () => { badge(); flush().then(warm); });
+  document.addEventListener('DOMContentLoaded', () => { hookPh(); badge(); flush().then(warm); });
   setInterval(flush, 30000);
 })();
