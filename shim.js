@@ -7,7 +7,7 @@
   const WRITE = ['save', 'uploadFoto'];
   const FALLBACK = {getRecord: null, poinAktif: 0, regs: [], nextReg: 'Otomatis saat online'};
   const MEM = {};
-  let DBP, busy = false, bd, uid = 0;
+  let DBP, busy = false, bd, uid = 0, FG = 0;  // FG = jumlah pekerjaan petugas yang sedang berjalan
 
   // ---------- penyimpanan lokal (IndexedDB, cadangan: memori) ----------
   const db = () => DBP || (DBP = new Promise(ok => {
@@ -46,6 +46,7 @@
     const c = (await kv('get', 'cache')) || {};
     Object.keys(c).forEach(k => { if (k.indexOf('@t:') == 0 && SUMMARY.indexOf(k.slice(3).split(':')[0]) >= 0) delete c[k]; });
     HOT = {};
+    Object.keys(PRE).forEach(k => delete PRE[k]);
     await kv('set', 'cache', c);
     if (!isOff()) setTimeout(refreshDash, 300);  // ambil angka dashboard terbaru di belakang layar, supaya saat kembali ke dashboard sudah siap
   }
@@ -71,6 +72,14 @@
   const READS = ['getSettings', 'nextReg', 'regs', 'regsPlus', 'getRecord', 'report', 'dashboard', 'frekuensi', 'poinAktif', 'listUsers', 'lcSummary', 'ttdSummary'];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const curMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+  // Server Google melambat bila banyak permintaan sekaligus (diukur: 3 permintaan bersamaan selesai berurutan 4 > 17 > 27 detik).
+  // Pekerjaan di belakang layar dijalankan SATU per satu, dan baru mulai saat petugas tidak sedang menunggu server.
+  let bgChain = Promise.resolve();
+  const bgRun = (fn, anyTime) => {
+    const p = bgChain.then(async () => { if (!anyTime) while (FG > 0) await sleep(300); return fn(); });
+    bgChain = p.then(() => {}, () => {});
+    return p;
+  };
   async function once(fn, args, ms) {
     const ac = ms && window.AbortController ? new AbortController() : null;
     const to = ac ? setTimeout(() => ac.abort(), ms) : 0;
@@ -94,15 +103,69 @@
     }
   }
 
+  // ---------- siapkan data form di belakang layar ----------
+  // Saat petugas berada di Dashboard / menu Input, data form miliknya diambil lebih dulu (berlaku 2 menit, sekali pakai),
+  // jadi saat form diketuk langsung terbuka tanpa menunggu server Google.
+  const PRE = {}, PRE_MS = 120000, FORMS = {security: ['Klaim'], bengkel: ['Bengkel'], pu: ['PU'], operasi: ['Operasi']};
+  let preBusy = 0, preAt = 0;
+  const takePre = f => { const e = PRE[f]; if (!e) return null; delete PRE[f]; if (Date.now() - e.t >= PRE_MS) return null; e.run(); return e.p; };
+  const myForms = () => { try { const u = typeof U != 'undefined' ? U : null; return !u ? [] : u.peran == 'admin' ? ['Klaim', 'Bengkel', 'PU', 'Operasi'] : (FORMS[u.peran] || []); } catch (e) { return []; } };
+  function prefetch(f) {
+    let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
+    if (!tk || !navigator.onLine || isOff()) return null;
+    const old = PRE[f];
+    if (old && Date.now() - old.t < PRE_MS - 30000) return old.p;  // masih segar
+    let started = false, run;
+    const job = new Promise((ok, no) => { run = () => { if (started) return; started = true; rpc('api', [tk, 'regsPlus', [f, f]], BGO).then(ok, no); }; });
+    bgRun(() => { run(); return job.catch(() => {}); }, true);  // masuk antrean belakang layar (bila petugas mengetuk form lebih dulu, langsung dijalankan)
+    const p = job.then(r => {
+      if (!r || !Array.isArray(r.list)) throw new Error('data form tidak lengkap');
+      const pairs = [['regs:' + JSON.stringify([f]), r.list]];  // salinan untuk mode offline
+      if (r.next !== undefined) pairs.push(['nextReg:[]', r.next]);
+      if (r.list.length) {
+        if (r.rec !== undefined) pairs.push(['getRecord:' + JSON.stringify([f, r.list[0].v]), r.rec]);
+        if (r.poin !== undefined) pairs.push(['poinAktif:' + JSON.stringify([r.list[0].v]), r.poin]);
+      }
+      cacheSetMany(pairs).catch(() => {});
+      return r;
+    });
+    PRE[f] = {t: Date.now(), p: p, run: run};
+    p.catch(() => { if (PRE[f] && PRE[f].p === p) delete PRE[f]; });
+    return p;
+  }
+  async function prefetchAll() {
+    if (preBusy || Date.now() - preAt < 20000) return;
+    preBusy = 1; preAt = Date.now();
+    try {
+      for (const f of myForms()) {
+        while (FG > 0) await sleep(400);  // petugas sedang menyimpan / memuat: server dipakai dia dulu
+        const p = prefetch(f);
+        if (p) { try { await p; } catch (e) {} }
+      }
+    } finally { preBusy = 0; }
+  }
+  function hookGo() {
+    try {
+      const f = window.go;
+      if (typeof f != 'function' || f.__pf) return;
+      const g = function (p) { try { if (p == 'dash' || p == 'input') setTimeout(prefetchAll, 600); } catch (e) {} return f.apply(this, arguments); };
+      g.__pf = 1; window.go = g;
+    } catch (e) {}
+  }
+
   // ---------- baca data: online -> simpan salinan, offline -> pakai salinan ----------
   // Buka form = SATU panggilan: daftar nomor + data awal yang pasti diminta form itu (nomor baru / data nomor pertama / point)
   async function regsBundle(args) {
     const form = typeof P != 'undefined' && P == 'form' && typeof X != 'undefined' ? X : '';
     if (['Klaim', 'Bengkel', 'PU', 'Operasi'].indexOf(form) < 0) return undefined;
     const a = args[2] || [];
-    let r;
-    try { r = await rpc('api', [args[0], 'regsPlus', [a[0], form]], RD); }
-    catch (e) { if (e instanceof NetErr) throw e; return undefined; }  // Code.gs lama / galat lain: pakai cara biasa
+    let r = null;
+    const pre = a[0] === form ? takePre(form) : null;  // sudah disiapkan di belakang layar? pakai itu (bisa masih berjalan)
+    if (pre) { try { r = await pre; } catch (e) { r = null; } }
+    if (!r) {
+      try { r = await rpc('api', [args[0], 'regsPlus', [a[0], form]], RD); }
+      catch (e) { if (e instanceof NetErr) throw e; return undefined; }  // Code.gs lama / galat lain: pakai cara biasa
+    }
     if (!r || !Array.isArray(r.list)) return undefined;
     const pairs = [['regs:' + JSON.stringify(a), r.list]];
     const seed = (f, aa, v) => { const k = f + ':' + JSON.stringify(aa); pairs.push([k, v]); hotPut(k, Promise.resolve(v)); };
@@ -128,7 +191,7 @@
     if (BG[key]) return;
     BG[key] = 1;
     try {
-      const r = await rpc('api', args, BGO);
+      const r = await bgRun(() => rpc('api', args, BGO));
       await cacheSet(key, r);
       if (JSON.stringify(r) !== JSON.stringify(old)) repaint(args[1]);
     } catch (e) {} finally { delete BG[key]; }
@@ -152,7 +215,7 @@
     if (Date.now() - setAt < 30000) return;
     setAt = Date.now();
     try {
-      const r = await rpc('api', args, BGO);
+      const r = await bgRun(() => rpc('api', args, BGO));
       await cacheSet(key, r);
       try { if (typeof S != 'undefined' && JSON.stringify(S) != JSON.stringify(r)) S = r; } catch (e) {}
     } catch (e) {}
@@ -299,11 +362,10 @@
     lastWarm = Date.now();
     await sleep(3000);  // beri waktu layar pertama selesai dimuat dulu
     const m = curMonth();
-    const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]], ['ttdSummary', [m]]];
+    const list = [['getSettings', []], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]], ['ttdSummary', [m]]];
     for (const [f, a] of list) {
-      while (FG > 0) await sleep(500);  // petugas sedang memakai aplikasi: server dipakai dia dulu
       if (localStorage.getItem('tk') !== tk || isOff()) return;
-      await read([tk, f, a], true).catch(() => {});
+      await bgRun(() => read([tk, f, a], true)).catch(() => {});  // di belakang layar, satu per satu
     }
   }
 
@@ -326,12 +388,12 @@
   async function note(m) { await badge(); if (bd) { bd.textContent = m; bd.style.display = 'block'; } }
 
   // ---------- pengganti google.script.run ----------
-  let FG = 0, sc = 0;  // FG = jumlah pekerjaan petugas yang sedang berjalan
+  let sc = 0;
   // Buka aplikasi: pakai data akun yang tersimpan di HP (layar langsung tampil), cek token ke server di belakang layar
   function sessCheck(a) {
     if (sc || !navigator.onLine || isOff()) return;
     sc = 1;
-    rpc('session', a, RD).then(r => {
+    bgRun(() => rpc('session', a, {ms: 20000, tries: 1})).then(r => {
       kv('set', 'session', r); kv('set', 'sessTk', a[0]);
       try { if (typeof U != 'undefined' && U && (U.peran != r.peran || U.nama != r.nama)) { U.peran = r.peran; U.nama = r.nama; } } catch (e) {}
     }, e => {
@@ -355,7 +417,7 @@
     }
     if (fn == 'session') {
       const s = await kv('get', 'session'), st = await kv('get', 'sessTk');
-      if (s && (!st || st === a[0])) { sessCheck(a); return s; }  // (!st = sudah login sebelum pembaruan ini)
+      if (s && (!st || st === a[0])) { sessCheck(a); setTimeout(prefetchAll, 2500); return s; }  // (!st = sudah login sebelum pembaruan ini)
       try { const r = await rpc(fn, a, RD); kv('set', 'session', r); kv('set', 'sessTk', a[0]); return r; }
       catch (e) { if (e instanceof NetErr && s) return s; throw e; }
     }
@@ -366,6 +428,7 @@
       kv('set', 'sessTk', r.token);
       if (b) await seed(b);
       setTimeout(() => flush().then(warm), 3000);
+      setTimeout(prefetchAll, 1200);
       return r;
     }
     if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); await kv('del', 'sessTk'); return rpc(fn, a).catch(() => true); }
@@ -384,8 +447,10 @@
   window.addEventListener('online', () => { badge(); flush().then(warm); });
   window.addEventListener('offline', badge);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) flush().then(warm); });
-  document.addEventListener('DOMContentLoaded', () => { hookPh(); badge(); flush().then(warm); });
+  document.addEventListener('DOMContentLoaded', () => { hookPh(); hookGo(); badge(); flush().then(warm); });
   setInterval(flush, 30000);
+  // selama petugas berada di Dashboard / menu Input, data form disegarkan tiap ~90 detik supaya selalu siap
+  setInterval(() => { try { if (!document.hidden && typeof P != 'undefined' && (P == 'dash' || P == 'input')) prefetchAll(); } catch (e) {} }, 60000);
   // Layar login terbuka: bangunkan server Google sekarang, sementara petugas mengetik username & password
   try { if (!localStorage.getItem('tk') && navigator.onLine && !isOff()) fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: 'ping', args: []})}).catch(() => {}); } catch (e) {}
 })();
