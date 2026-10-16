@@ -106,7 +106,7 @@
   // ---------- siapkan data form di belakang layar ----------
   // Saat petugas berada di Dashboard / menu Input, data form miliknya diambil lebih dulu (berlaku 2 menit, sekali pakai),
   // jadi saat form diketuk langsung terbuka tanpa menunggu server Google.
-  const PRE = {}, PRE_MS = 120000, FORMS = {security: ['Klaim'], bengkel: ['Bengkel'], pu: ['PU'], operasi: ['Operasi']};
+  const PRE = {}, PRE_MS = 120000, FORMS = {security: ['Klaim'], bengkel: ['Bengkel'], pu: ['PU'], operasi: ['Operasi'], cat: ['Bengkel']};
   let preBusy = 0, preAt = 0;
   const takePre = f => { const e = PRE[f]; if (!e) return null; delete PRE[f]; if (Date.now() - e.t >= PRE_MS) return null; e.run(); return e.p; };
   const myForms = () => { try { const u = typeof U != 'undefined' ? U : null; return !u ? [] : u.peran == 'admin' ? ['Klaim', 'Bengkel', 'PU', 'Operasi'] : (FORMS[u.peran] || []); } catch (e) { return []; } };
