@@ -889,6 +889,33 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   e.preventDefault();e.stopImmediatePropagation();unduh(t=='pdf'?'pdf':'xlsx')},true);
  try{csv=function(){unduh('xlsx')}}catch(e){}
 })();
+// ---- KATEGORI PU: kartu "Jenis Kerusakan" di dashboard ikut Input PU; "LC" dihapus dari pilihan Kategori PU ----
+(function(){
+ const KAT=['R','SR','B','SB','KR','Subkon'],CLS=[5,2,6,3,1,7];
+ // 1) form Input PU: pilihan Kategori tanpa LC (jumlah LC sudah muncul sendiri dari Input Bengkel / LC)
+ try{OPT.kat=OPT.kat.filter(x=>x!='LC'&&x!='lc')}catch(e){}
+ // 2) kartu "Jenis Kerusakan": isinya = jumlah Input PU per Kategori pada bulan yang dipilih
+ const tiles=k=>KAT.map((j,i)=>`<div class="dm c${CLS[i]}"><b>${j}</b><div><span class="n">${k?(k[j]||0):'·'}</span> <small>Unit</small></div></div>`).join('');
+ const card=()=>{const v=document.getElementById('v');return v?[...v.querySelectorAll('.cd')].find(c=>{const h=c.querySelector('h3');return h&&/Jenis Kerusakan/i.test(h.textContent)}):null};
+ let seq=0;
+ async function isi(c){
+  const g=c.querySelector('.g3'),t=c.querySelector('.tot b');if(!g)return;
+  const my=++seq,m=M;
+  g.innerHTML=tiles(null);if(t)t.textContent='… Unit';
+  const sama=()=>my===seq&&card()===c&&m===M;
+  let k;
+  try{const d=await run('dashboard',m);k=d&&d.kat}catch(e){if(sama())g.innerHTML=tiles({});if(sama()&&t)t.textContent='0 Unit';return}
+  if(!sama())return;
+  if(!k){  // Code.gs belum diperbarui: hitung dari laporan PU
+   k={};try{(await run('report','PU',m)||[]).forEach(r=>{const x=String(r.Kategori==null?'':r.Kategori).trim();if(x)k[x]=(k[x]||0)+1})}catch(e){}
+   if(!sama())return}
+  g.innerHTML=tiles(k);if(t)t.textContent=KAT.reduce((s,j)=>s+(k[j]||0),0)+' Unit'}
+ function cek(){
+  if(typeof P=='undefined'||P!='dash')return;
+  const c=card();if(!c||c.dataset.kat)return;
+  c.dataset.kat='1';isi(c)}
+ try{const v=document.getElementById('v');if(v)new MutationObserver(cek).observe(v,{childList:true,subtree:true})}catch(e){}
+})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
