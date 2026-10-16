@@ -740,7 +740,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   r++;r++;const hr=r;add(head.map((h,i)=>cs(i,h,2)));
   rows.forEach(row=>{r++;const tot=String(row[0])=='TOTAL';add(head.map((_,i)=>{const v=row[i];return typeof v=='number'&&isFinite(v)?cn(i,v,tot?5:3):cs(i,v==null?'':v,tot?5:3)}))});
   const cols=head.map((h,i)=>{let m=maxLine(h);rows.forEach(x=>{m=Math.max(m,Math.min(maxLine(x[i]),45))});return`<col min="${i+1}" max="${i+1}" width="${Math.min(60,Math.max(9,m+3))}" customWidth="1"/>`}).join('');
-  const M='http://schemas.openxmlformats.org/spreadsheetml/2006/main',RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships',H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    const M='http://schemas.openxmlformats.org/spreadsheetml/2006/main',RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships',H='<'+'?xml version="1.0" encoding="UTF-8" standalone="yes"?'+'>\n';
   const sheet=H+`<worksheet xmlns="${M}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${hr}" topLeftCell="A${hr+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${R.join('')}</sheetData></worksheet>`;
   const bd='<border><left style="thin"><color rgb="FFBFC6D6"/></left><right style="thin"><color rgb="FFBFC6D6"/></right><top style="thin"><color rgb="FFBFC6D6"/></top><bottom style="thin"><color rgb="FFBFC6D6"/></bottom><diagonal/></border>';
   const fl=c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`;
@@ -916,6 +916,43 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   c.dataset.kat='1';isi(c)}
  try{const v=document.getElementById('v');if(v)new MutationObserver(cek).observe(v,{childList:true,subtree:true})}catch(e){}
 })();
+Index-tambahan-server-lambat.js
+// ---- server Google lambat: tampilkan "Memuat…" lalu tombol "Coba lagi", bukan layar kosong ----
+(function(){try{
+ const SLOW='Server Google sedang lambat, mohon tunggu sebentar…';
+ const kartu=(judul,pesan)=>'<div class="cd" style="text-align:center"><h3 style="margin:0 0 6px">'+judul+'</h3><p style="color:#5B6478;margin:0 0 14px">'+esc(pesan)+'</p><button class="btn p" style="width:100%" id="rt">Coba lagi</button></div>';
+ // layar pertama setelah login / saat aplikasi dibuka
+ start=async function(){
+  $('header').style.display='';$('nav').style.display='';
+  V.innerHTML='<div style="text-align:center;color:#5B6478;padding:48px 16px"><p id="mmt" style="margin:0">Memuat data…</p></div>';
+  const tm=setTimeout(()=>{const e=$('#mmt');if(e)e.textContent=SLOW},6000);
+  try{S=await run('getSettings')}
+  catch(e){
+   clearTimeout(tm);
+   if(!TK)return;
+   V.innerHTML=kartu('Data belum bisa dimuat',e.message||'Server tidak merespons.');
+   $('#rt').onclick=()=>start();
+   return}
+  clearTimeout(tm);go('dash')};
+ // tombol Masuk: beri tahu bahwa sedang diproses
+ doLogin=async function(){
+  const b=$('#lbtn');if(!b||b.disabled)return;
+  b.disabled=true;const t0=b.textContent;b.textContent='Memproses…';
+  let h=$('#lhint');if(!h){h=document.createElement('p');h.id='lhint';h.style.cssText='margin:10px 0 0;font-size:13px;color:#5B6478;text-align:center';b.after(h)}
+  const tm=setTimeout(()=>{h.textContent=SLOW},5000);
+  try{const r=await raw('login',$('#lu').value,$('#lp').value);clearTimeout(tm);TK=r.token;U=r;try{localStorage.setItem('tk',TK)}catch(e){}start()}
+  catch(e){clearTimeout(tm);h.textContent='';toast(e.message||'Login gagal');b.disabled=false;b.textContent=t0}};
+ // halaman lain: kalau gagal dimuat jangan berhenti di "Memuat…"
+ const _rn=render;let seq=0;
+ const loading=()=>V.children.length==1&&V.firstElementChild.tagName=='P'&&V.textContent.trim().indexOf('Memuat')==0;
+ render=async function(){
+  const my=++seq;
+  const tm=setTimeout(()=>{if(my===seq&&loading())V.firstElementChild.textContent='Memuat… '+SLOW},6000);
+  try{await _rn()}finally{clearTimeout(tm)}
+  if(my===seq&&loading()){
+   V.innerHTML=kartu('Data belum bisa dimuat','Server Google lambat atau tidak merespons.');
+   $('#rt').onclick=()=>render()}};
+}catch(e){}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
