@@ -64,14 +64,34 @@
 
   // ---------- panggilan ke server ----------
   class NetErr extends Error {}
-  async function rpc(fn, args) {
-    let res;
-    try { res = await fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: fn, args: args})}); }
-    catch (e) { throw new NetErr('Tidak ada koneksi internet'); }
-    let j;
-    try { j = await res.json(); } catch (e) { throw new Error('Server tidak merespons dengan benar, coba lagi'); }
-    if (!j.ok) throw new Error(j.error);
-    return j.data;
+  class BadResp extends Error {}
+  // Server Google kadang lambat (sampai puluhan detik). Baca data: tunggu maksimal 20 detik, bila gagal coba sekali lagi.
+  // Simpan data (save/foto) TIDAK diberi batas waktu atau diulang, supaya tidak tersimpan dua kali.
+  const RD = {ms: 20000, tries: 2}, BGO = {ms: 25000, tries: 1};
+  const READS = ['getSettings', 'nextReg', 'regs', 'regsPlus', 'getRecord', 'report', 'dashboard', 'frekuensi', 'poinAktif', 'listUsers', 'lcSummary', 'ttdSummary'];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const curMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+  async function once(fn, args, ms) {
+    const ac = ms && window.AbortController ? new AbortController() : null;
+    const to = ac ? setTimeout(() => ac.abort(), ms) : 0;
+    const dead = () => !!ac && ac.signal.aborted;
+    try {
+      let res;
+      try { res = await fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: fn, args: args}), signal: ac ? ac.signal : undefined}); }
+      catch (e) { throw new NetErr(navigator.onLine ? 'Server Google tidak merespons, coba lagi' : 'Tidak ada koneksi internet'); }
+      let j;
+      try { j = await res.json(); }
+      catch (e) { throw dead() ? new NetErr('Server Google tidak merespons, coba lagi') : new BadResp('Server tidak merespons dengan benar, coba lagi'); }
+      if (!j.ok) throw new Error(j.error);
+      return j.data;
+    } finally { clearTimeout(to); }
+  }
+  async function rpc(fn, args, o) {
+    o = o || {};
+    for (let i = 1; ; i++) {
+      try { return await once(fn, args, o.ms || 0); }
+      catch (e) { if (i >= (o.tries || 1) || !(e instanceof NetErr || e instanceof BadResp)) throw e; }
+    }
   }
 
   // ---------- baca data: online -> simpan salinan, offline -> pakai salinan ----------
@@ -81,7 +101,7 @@
     if (['Klaim', 'Bengkel', 'PU', 'Operasi'].indexOf(form) < 0) return undefined;
     const a = args[2] || [];
     let r;
-    try { r = await rpc('api', [args[0], 'regsPlus', [a[0], form]]); }
+    try { r = await rpc('api', [args[0], 'regsPlus', [a[0], form]], RD); }
     catch (e) { if (e instanceof NetErr) throw e; return undefined; }  // Code.gs lama / galat lain: pakai cara biasa
     if (!r || !Array.isArray(r.list)) return undefined;
     const pairs = [['regs:' + JSON.stringify(a), r.list]];
@@ -108,7 +128,7 @@
     if (BG[key]) return;
     BG[key] = 1;
     try {
-      const r = await rpc('api', args);
+      const r = await rpc('api', args, BGO);
       await cacheSet(key, r);
       if (JSON.stringify(r) !== JSON.stringify(old)) repaint(args[1]);
     } catch (e) {} finally { delete BG[key]; }
@@ -132,7 +152,7 @@
     if (Date.now() - setAt < 30000) return;
     setAt = Date.now();
     try {
-      const r = await rpc('api', args);
+      const r = await rpc('api', args, BGO);
       await cacheSet(key, r);
       try { if (typeof S != 'undefined' && JSON.stringify(S) != JSON.stringify(r)) S = r; } catch (e) {}
     } catch (e) {}
@@ -156,7 +176,7 @@
     }
     try {
       if (f == 'regs' && !nobundle) { const b = await regsBundle(args); if (b !== undefined) return b; }
-      const r = await rpc('api', args);
+      const r = await rpc('api', args, READS.indexOf(f) >= 0 ? RD : undefined);
       if (f == 'saveSettings') await cacheDel('getSettings:[]');  // setelah pengaturan diubah, ambil yang baru dari server
       cacheSet(key, r);
       return r;
@@ -173,7 +193,7 @@
         return hit;
       }
       if (f in FALLBACK) return FALLBACK[f];
-      throw new Error('Offline: data ini belum pernah dimuat saat online');
+      throw new Error(navigator.onLine && !isOff() ? 'Server Google sedang lambat atau tidak merespons.' : 'Offline: data ini belum pernah dimuat saat online');
     }
   }
 
@@ -277,9 +297,14 @@
     const tk = localStorage.getItem('tk');
     if (!tk || !navigator.onLine || isOff() || Date.now() - lastWarm < 300000) return;
     lastWarm = Date.now();
-    const d = new Date(), m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    await sleep(3000);  // beri waktu layar pertama selesai dimuat dulu
+    const m = curMonth();
     const list = [['getSettings', []], ['regs', ['Klaim']], ['regs', ['Bengkel']], ['regs', ['PU']], ['regs', ['Operasi']], ['dashboard', [m]], ['lcSummary', [m]], ['frekuensi', [m]], ['ttdSummary', [m]]];
-    for (const [f, a] of list) await read([tk, f, a], true).catch(() => {});
+    for (const [f, a] of list) {
+      while (FG > 0) await sleep(500);  // petugas sedang memakai aplikasi: server dipakai dia dulu
+      if (localStorage.getItem('tk') !== tk || isOff()) return;
+      await read([tk, f, a], true).catch(() => {});
+    }
   }
 
   // ---------- penanda di layar ----------
@@ -301,22 +326,49 @@
   async function note(m) { await badge(); if (bd) { bd.textContent = m; bd.style.display = 'block'; } }
 
   // ---------- pengganti google.script.run ----------
+  let FG = 0, sc = 0;  // FG = jumlah pekerjaan petugas yang sedang berjalan
+  // Buka aplikasi: pakai data akun yang tersimpan di HP (layar langsung tampil), cek token ke server di belakang layar
+  function sessCheck(a) {
+    if (sc || !navigator.onLine || isOff()) return;
+    sc = 1;
+    rpc('session', a, RD).then(r => {
+      kv('set', 'session', r); kv('set', 'sessTk', a[0]);
+      try { if (typeof U != 'undefined' && U && (U.peran != r.peran || U.nama != r.nama)) { U.peran = r.peran; U.nama = r.nama; } } catch (e) {}
+    }, e => {
+      if (!/SESI_HABIS/.test(e.message)) return;
+      try { if (localStorage.getItem('tk') == a[0] && typeof bye == 'function') bye(); } catch (x) {}
+    }).then(() => { sc = 0; });
+  }
+  // Data layar pertama (pengaturan + dashboard) ikut dibawa jawaban login -> setelah login tidak perlu panggilan lagi
+  async function seed(b) {
+    const m = curMonth(), pairs = [];
+    const put = (f, a, v) => { if (v === undefined || v === null) return; const k = f + ':' + JSON.stringify(a); pairs.push([k, v]); hotPut(k, Promise.resolve(v)); };
+    put('getSettings', [], b.settings); put('dashboard', [m], b.dash); put('lcSummary', [m], b.lc); put('ttdSummary', [m], b.ttd);
+    if (b.settings) setAt = Date.now();
+    try { await cacheSetMany(pairs); } catch (e) {}
+  }
   async function call(fn, a) {
     if (fn == 'api') {
       if (/^ttd(Link|Status)$/.test(a[1])) return rpc(fn, a);  // TTD pengemudi (barcode & status): selalu ke server, tidak disimpan di HP
-      return WRITE.indexOf(a[1]) >= 0 ? write(a) : read(a);
+      FG++;
+      try { return await (WRITE.indexOf(a[1]) >= 0 ? write(a) : read(a)); } finally { FG--; }
     }
     if (fn == 'session') {
-      try { const r = await rpc(fn, a); kv('set', 'session', r); return r; }
-      catch (e) { if (e instanceof NetErr) { const s = await kv('get', 'session'); if (s) return s; } throw e; }
+      const s = await kv('get', 'session'), st = await kv('get', 'sessTk');
+      if (s && (!st || st === a[0])) { sessCheck(a); return s; }  // (!st = sudah login sebelum pembaruan ini)
+      try { const r = await rpc(fn, a, RD); kv('set', 'session', r); kv('set', 'sessTk', a[0]); return r; }
+      catch (e) { if (e instanceof NetErr && s) return s; throw e; }
     }
     if (fn == 'login') {
-      const r = await rpc(fn, a);
+      const r = await rpc(fn, [a[0], a[1], curMonth()], {ms: 25000, tries: 2});
+      const b = r.boot; delete r.boot;
       kv('set', 'session', {username: r.username, nama: r.nama, peran: r.peran});
-      setTimeout(() => flush().then(warm), 1500);
+      kv('set', 'sessTk', r.token);
+      if (b) await seed(b);
+      setTimeout(() => flush().then(warm), 3000);
       return r;
     }
-    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); return rpc(fn, a).catch(() => true); }
+    if (fn == 'logout') { await kv('set', 'cache', {}); await kv('del', 'session'); await kv('del', 'sessTk'); return rpc(fn, a).catch(() => true); }
     return rpc(fn, a);
   }
   const mk = (ok, no) => new Proxy({}, {get: (t, p) => {
@@ -334,4 +386,6 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) flush().then(warm); });
   document.addEventListener('DOMContentLoaded', () => { hookPh(); badge(); flush().then(warm); });
   setInterval(flush, 30000);
+  // Layar login terbuka: bangunkan server Google sekarang, sementara petugas mengetik username & password
+  try { if (!localStorage.getItem('tk') && navigator.onLine && !isOff()) fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: 'ping', args: []})}).catch(() => {}); } catch (e) {}
 })();
