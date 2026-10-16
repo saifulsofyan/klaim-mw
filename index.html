@@ -285,7 +285,7 @@ async function saveLC(){
   setTimeout(()=>go('dash'),800)
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
-// ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
+// =================  (barcode -> HP pengemudi -> tanda tangan digital) =================
 (function(){const s=document.createElement('style');s.textContent=`
 .dg{gap:4px}.dg .tl{padding:8px 1px 6px}.dg .tl .n{font-size:28px}.dg .tl b{font-size:10px}.dg .tl .u{font-size:10px}.dg .ch{font-size:10px;width:94%}
 .tk{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--ln);font-size:13.5px}.tk:last-of-type{border-bottom:0}.tk span{color:var(--m)}.tk b{text-align:right;word-break:break-word}
@@ -384,10 +384,10 @@ function qrSvg(text){
 // ---- sisi Operasi: pilih No Registrasi -> data otomatis + barcode ----
 let TTDT=null,TTDK='';
 async function vTtd(){
- head({t:'TTD Pengemudi',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
- if(!ttdOk()){V.innerHTML='<div class="cd">Akun Anda tidak punya akses TTD Pengemudi.</div>';return}
+ head({t:'',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
+ if(!ttdOk()){V.innerHTML='<div class="cd">Akun Anda tidak punya akses .</div>';return}
  const rg=await run('regs','TTD');
- V.innerHTML=`<div class="bn"><div><h2>TTD PENGEMUDI</h2><p>Pilih No Registrasi, lalu minta pengemudi scan barcode untuk tanda tangan digital.</p></div>${ic('sign',56,'#fff')}</div>
+ V.innerHTML=`<div class="bn"><div><h2></h2><p>Pilih No Registrasi, lalu minta pengemudi scan barcode untuk tanda tangan digital.</p></div>${ic('sign',56,'#fff')}</div>
 <div class="cd"><label class="f"><span class="l">No Registrasi</span><select class="in" id="ttdReg" onchange="ttdPick(this.value)"><option value="">Pilih No Registrasi</option>${opt(rg.map(r=>r.v+'|'+r.l))}</select><small>${rg.length?'Hanya nomor yang belum ditandatangani.':'Semua nomor registrasi sudah ditandatangani.'}</small></label><div id="ttdBody"></div></div>`}
 async function ttdRender(){V.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';try{await vTtd()}catch(e){toast(e.message||'Terjadi kesalahan')}}
 async function ttdPick(v){
@@ -410,8 +410,8 @@ async function ttdPoll(){
  const el=$('#ttdSt');if(!el)return;
  if(s=='signed'){
   clearInterval(TTDT);TTDK='';try{window.MODE&&MODE.stale&&MODE.stale()}catch(e){}
-  $('#ttdQr').style.display='none';el.className='qs ok';el.textContent='TTD pengemudi sudah tersimpan';
-  el.insertAdjacentHTML('afterend','<div class="row"><button type="button" class="btn p" onclick="ttdRender()">TTD Pengemudi Lain</button></div>');
+  $('#ttdQr').style.display='none';el.className='qs ok';el.textContent=' sudah tersimpan';
+  el.insertAdjacentHTML('afterend','<div class="row"><button type="button" class="btn p" onclick="ttdRender()"> Lain</button></div>');
   const cp=el.parentNode.querySelector('.row .btn.s');if(cp)cp.parentNode.remove();
  }else if(s=='expired'){
   clearInterval(TTDT);TTDK='';$('#ttdQr').style.display='none';el.className='qs er';el.textContent='Barcode sudah kedaluwarsa. Pilih ulang No Registrasi untuk membuat barcode baru.'}}
@@ -423,12 +423,12 @@ async function ttdPublic(tk){
  $('header').style.display='none';$('nav').style.display='none';
  V.innerHTML='<p style="text-align:center;color:var(--m);padding-top:20vh">Memuat data…</p>';
  let d;try{d=await raw('ttdGet',tk)}catch(e){return ttdMsg(e.message||'Gagal memuat data',/internet|koneksi/i.test(e.message||''))}
- V.innerHTML=`<div style="text-align:center;padding:18px 0 4px"><div class="lg" style="margin:0 auto 8px;width:56px;height:56px;background:var(--b)">${ic('car',34,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><p style="color:var(--m);margin:2px 0 0;font-size:13px">${esc(S.pool)}</p></div>
+ V.innerHTML=`<div style="text-align:center;padding:18px 0 4px"><div class="lg" style="margin:0 auto 8px;width:56px;height:56px;background:var(--b)">${ic('car',34,'#fff')}</div><h2 style="margin:0;font-size:19px"></h2><p style="color:var(--m);margin:2px 0 0;font-size:13px">${esc(S.pool)}</p></div>
 <div class="cd" id="ttdCard">${ttdRows(d)}</div>
 <div class="cd" id="sgCard"><span class="l">Tanda tangan di kotak ini</span><div class="sg"><canvas id="sg"></canvas><span id="sgh">Tanda tangan di sini</span></div><div class="row" style="margin-top:10px"><button type="button" class="btn s" onclick="sgInit()">Hapus</button><button type="button" class="btn p" id="sgOk" onclick="sgSend()" disabled>Simpan</button></div></div>`;
  sgInit()}
 function ttdMsg(m,retry){
- V.innerHTML=`<div style="padding-top:14vh;text-align:center"><div class="lg" style="margin:0 auto 12px;width:64px;height:64px;background:var(--b)">${ic('car',40,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><div class="cd" style="text-align:left"><div class="qs er" style="margin:0">${esc(m)}</div>${retry?'<div class="row" style="margin-top:10px"><button type="button" class="btn p" onclick="ttdPublic(TTD_Q)">Coba Lagi</button></div>':''}</div></div>`}
+ V.innerHTML=`<div style="padding-top:14vh;text-align:center"><div class="lg" style="margin:0 auto 12px;width:64px;height:64px;background:var(--b)">${ic('car',40,'#fff')}</div><h2 style="margin:0;font-size:19px"></h2><div class="cd" style="text-align:left"><div class="qs er" style="margin:0">${esc(m)}</div>${retry?'<div class="row" style="margin-top:10px"><button type="button" class="btn p" onclick="ttdPublic(TTD_Q)">Coba Lagi</button></div>':''}</div></div>`}
 function sgInit(){
  const c=$('#sg');if(!c)return;
  const r=c.getBoundingClientRect(),k=window.devicePixelRatio||1,x=c.getContext('2d');
@@ -454,7 +454,7 @@ async function sgSend(){
   toast(m);b.disabled=false;b.textContent='Simpan'}}
 window.addEventListener('resize',()=>{if($('#sg')&&!SG.len)sgInit()});
 
-// ---- tile "TTD Pengemudi" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
+// ---- tile "" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
 function ttdTile(){
  if(P!='dash'||!ttdOk())return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
@@ -464,7 +464,7 @@ function ttdTile(){
  const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
  const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
  const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
- if(b)b.textContent='TTD Pengemudi';if(ch)ch.textContent='Operasi';setT(n,'–');
+ if(b)b.textContent='';if(ch)ch.textContent='Operasi';setT(n,'–');
  const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})}
@@ -616,18 +616,18 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
    if(a.length>1)a.forEach((x,i)=>{if(x.textContent.trim()==='Foto')x.textContent='Foto '+(i+1)})})};
  new MutationObserver(sync).observe(V,{childList:true,subtree:true});
 })();
-// ---- Tile "TTD Pengemudi" di dashboard: TERLIHAT oleh semua akun (PU, Security, Bengkel, dst.), tapi hanya Operasi/admin yang bisa membukanya ----
+// ---- Tile "" di dashboard: TERLIHAT oleh semua akun (PU, Security, Bengkel, dst.), tapi hanya Operasi/admin yang bisa membukanya ----
 ttdTile=function(){
  if(P!='dash')return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
  if(!op||op.parentNode.querySelector('[data-ttd]'))return;
  const g=op.parentNode,t=op.cloneNode(true);
  t.setAttribute('data-ttd','1');t.className=op.className.replace(/\bc\d\b/,'c7');
- t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses TTD Pengemudi')");   // tanpa akses: hanya muncul pesan
+ t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses ')");   // tanpa akses: hanya muncul pesan
  const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
  const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
  const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
- if(b)b.textContent='TTD Pengemudi';if(ch)ch.textContent='Operasi';setT(n,'–');
+ if(b)b.textContent='';if(ch)ch.textContent='Operasi';setT(n,'–');
  const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})};
@@ -952,6 +952,91 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   if(my===seq&&loading()){
    V.innerHTML=kartu('Data belum bisa dimuat','Server Google lambat atau tidak merespons.');
    $('#rt').onclick=()=>render()}};
+}catch(e){}})();
+ // ---- TAMPILAN WEB (layar lebar / komputer): menu di kiri, isi lebih besar dan dua kolom. Tampilan HP TIDAK berubah. ----
+(function(){try{
+ const css=`@media screen and (min-width:1000px){
+body{background:#F3F6FC}
+#app{max-width:none;min-height:100vh;display:block}
+#app header{padding:0 32px;height:80px;min-height:80px;gap:14px;box-shadow:0 2px 10px rgba(20,32,107,.2)}
+#app header .lg{width:52px;height:52px;border-radius:14px}
+#app .tt b{font-size:22px}
+#app .tt span{font-size:14px}
+#app .chip{font-size:12px}
+#app .chip b{font-size:16px}
+#app .md{font-size:13px;padding:7px 10px 7px 12px}
+#app .av{width:42px;height:42px;font-size:17px}
+#app nav{top:80px;bottom:0;left:0;transform:none;width:260px;max-width:none;height:auto;flex-direction:column;justify-content:flex-start;gap:6px;padding:20px 14px;border-top:0;border-right:1px solid var(--ln);background:#fff}
+#app nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:14px;font-size:16px;padding:15px 18px;border-radius:14px;transition:background .15s}
+#app nav button:hover{background:#EEF3FC}
+#app nav button.on{background:#E2EEFF}
+#app main{padding:18px max(40px,calc((100vw - 260px - 1360px)/2)) 56px calc(260px + max(40px,calc((100vw - 260px - 1360px)/2)))}
+body[data-p=login] #app main{padding:0 40px}
+body[data-p=login] #v>div{max-width:480px;margin:0 auto}
+#app .cd{padding:22px;border-radius:18px;margin-top:22px;background:#fff;box-shadow:0 2px 10px rgba(20,32,107,.08)}
+#app .hd{gap:14px;margin-bottom:16px}
+#app .hd h3{font-size:20px}
+#app .ico{width:48px;height:48px;border-radius:12px}
+#app .tot{padding:8px 16px;font-size:13px}
+#app .tot b{font-size:20px}
+#app .mp{margin:0 0 6px;padding:6px 16px;border-radius:14px;background:#fff}
+#app .mp select{font-size:16px}
+#app .bn{border-radius:20px;padding:30px 36px;margin-top:16px}
+#app .bn h2{font-size:30px}
+#app .bn p{font-size:16px;margin-top:8px}
+#app .bn svg{width:96px;height:96px}
+#app .g3,#app .g4,#app .g5{gap:16px}
+#app .tl{border-radius:16px;padding:22px 8px 16px;gap:4px;transition:transform .15s,box-shadow .15s}
+#app .tl:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(20,32,107,.14)}
+#app .tl b{font-size:15px;margin-top:6px}
+#app .tl .n{font-size:56px}
+#app .tl .n small{font-size:13px!important}
+#app .tl .u{font-size:14px}
+#app .ch{font-size:13px;padding:7px 0;margin-top:8px}
+#app .g5 .tl{padding:22px 8px;font-size:14px}
+#app .dm{border-radius:16px;padding:18px 0}
+#app .dm b{font-size:17px}
+#app .dm .n{font-size:46px}
+#app .dm small{font-size:15px}
+#app .mc{border-radius:18px;padding:22px 26px;gap:20px;margin-top:0;transition:transform .15s,box-shadow .15s}
+#app .mc:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(20,32,107,.12)}
+#app .mc .ico{width:80px!important;height:80px!important}
+#app .mc b{font-size:24px}
+#app .mc span{font-size:15px}
+#app .f{margin-bottom:18px}
+#app .l{font-size:14px;margin-bottom:2px}
+#app .in{height:50px;font-size:16px;border-radius:12px;padding:0 16px}
+#app textarea.in{height:120px;padding:12px 16px}
+#app .btn{min-height:54px;font-size:16px;border-radius:14px}
+#app .up{padding:22px;font-size:15px}
+#app .ph div{width:104px;height:104px}
+#app .pa{padding:16px}
+#app .pa b{font-size:34px}
+#app .info{font-size:14px;padding:16px;border-radius:14px}
+#app table{font-size:15px}
+#app th{padding:14px 12px;font-size:14px}
+#app td{padding:13px 12px}
+.toast{bottom:36px;font-size:15px;padding:13px 22px}
+#app #dataForm,#app #lcForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px;align-content:start}
+#app #dataForm fieldset,#app #lcForm fieldset{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px}
+#app form .f:has(textarea),#app form .f:has(.up),#app form .f:has(.pa){grid-column:1/-1}
+#app #dataForm>.row,#app #lcForm>.row{grid-column:1/-1;justify-content:flex-start;margin-top:6px}
+#app #dataForm>.row .btn,#app #lcForm>.row .btn{flex:0 0 220px}
+body[data-p=set] #app #v{max-width:1000px}
+
+}
+@media screen and (min-width:1280px){
+ body[data-p=dash] #v,body[data-p=input] #v{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;align-content:start}
+body[data-p=dash] #v>.mp,body[data-p=dash] #v>.bn,body[data-p=dash] #v>.cd:nth-child(3),body[data-p=dash] #v>.cd.hd,body[data-p=input] #v>.mp,body[data-p=input] #v>.bn{grid-column:1/-1}
+body[data-p=input] #v{row-gap:20px}
+
+}
+`;
+ const st=document.createElement('style');st.id='webcss';st.textContent=css;document.head.appendChild(st);
+ // penanda halaman yang sedang dibuka (dipakai CSS di atas)
+ const setP=p=>{try{document.body.setAttribute('data-p',p)}catch(e){}};
+ const _go=go;go=function(p,x){setP(p);return _go.apply(this,arguments)};
+ const _sl=showLogin;showLogin=function(){setP('login');return _sl.apply(this,arguments)};
 }catch(e){}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
