@@ -1038,6 +1038,57 @@ body[data-p=input] #v{row-gap:20px}
  const _go=go;go=function(p,x){setP(p);return _go.apply(this,arguments)};
  const _sl=showLogin;showLogin=function(){setP('login');return _sl.apply(this,arguments)};
 }catch(e){}})();
+ // ---- LAPORAN KLAIM: data Klaim dan LC digabung dalam satu tabel (urut No Registrasi). Layar maksimal 15 baris; semua baris tetap ada di Excel / PDF / Cetak ----
+// Berlaku untuk Rekap Harian dan Data Bulan. Angka ringkasan (Jumlah Klaim dst.) tetap menghitung Klaim saja. Rekap Bulanan tidak berubah.
+(function(){try{
+ const MAXV=15;   // jumlah baris maksimal yang tampil di layar
+ const KOL=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail','WA','Foto','Petugas','Lokasi','LawanTabrak'];
+ const st=document.createElement('style');
+ st.textContent='@media screen{#lr tr.lx{display:none}}.lcg{font-size:12px;color:#5B6478;margin:10px 2px 0;line-height:1.5}';
+ document.head.appendChild(st);
+ const dk=r=>String((r&&r.Tanggal)||'').slice(0,10);
+ const nr=r=>String((r&&r.NoReg)||'');
+ // satu baris LC -> bentuk kolom Klaim (kolom yang tidak ada di LC dikosongkan)
+ const ubah=(x,keys)=>{
+  const o={};keys.forEach(k=>{o[k]=''});
+  o.NoReg=x.NoReg||'';o.Tanggal=x.Tanggal||'';o.Bulan=x.Bulan||'';
+  o.JenisMobil=x.JenisKendaraan||'';o.NoMobil=x.NoMobil||'';o.Jenis='LC';o.Detail=x.Detail||'';
+  o.Foto=[x.FotoSebelum,x.FotoSesudah].filter(v=>v&&String(v).trim()).join('\n');
+  return o};
+ const ganti=(body,html)=>{const old=body.querySelector('.tb')||body.querySelector(':scope > p');const t=document.createElement('div');t.innerHTML=html;const nw=t.firstElementChild;if(old)old.replaceWith(nw);else body.appendChild(nw);return nw};
+ const info=(body,txt)=>{let p=body.querySelector('.lcg');if(!p){p=document.createElement('p');p.className='lcg np';body.appendChild(p)}p.textContent=txt};
+ let tok=0;
+ const _sl=showLap;
+ showLap=async function(){
+  const my=++tok;
+  const hasil=await _sl.apply(this,arguments);
+  try{
+   if(my!==tok||typeof LT=='undefined'||LT!=='Klaim')return hasil;
+   const lr=document.querySelector('#lr');if(!lr)return hasil;
+   const hari=/^\d{4}-\d{2}-\d{2}$/.test(LP),bulan=/^\d{4}-\d{2}$/.test(LP);
+   if(!hari&&!bulan)return hasil;   // Rekap Bulanan: tidak diubah
+   const body=lr.lastElementChild;if(!body||!body.classList.contains('cd'))return hasil;
+   const m=LM;
+   info(body,'Menggabungkan data LC…');
+   let lc=null;
+   try{lc=(await run('report','LC',m))||[]}catch(e){lc=null}
+   if(my!==tok||LT!=='Klaim'||!body.isConnected)return hasil;
+   const kl=Array.isArray(LR)?LR.slice():[];
+   const keys=kl.length?Object.keys(kl[0]):KOL;
+   const lcr=(lc||[]).filter(x=>hari?dk(x)===LP:true).map(x=>ubah(x,keys));
+   const all=kl.concat(lcr).sort((a,b)=>nr(a).localeCompare(nr(b),undefined,{numeric:true}));
+   if(!all.length){const p=body.querySelector('.lcg');if(p)p.remove();return hasil}
+   LR=all;LH=null;   // Excel / PDF memakai semua baris
+   const tb=ganti(body,tbl(all,null));
+   const trs=tb.querySelectorAll('tbody tr'),n=trs.length;
+   trs.forEach((tr,i)=>{if(i<n-MAXV)tr.classList.add('lx')});
+   let s='Klaim '+kl.length+' + LC '+lcr.length+' = '+n+' data, urut No Registrasi.';
+   if(lc===null)s='Data LC belum bisa dimuat, tabel ini hanya berisi Klaim ('+kl.length+' data). Buka menu Laporan lagi untuk mencoba ulang.';
+   if(n>MAXV)s+=' Layar menampilkan '+MAXV+' data terbaru; semua '+n+' data ada di Excel, PDF, dan Cetak.';
+   info(body,s);
+  }catch(e){try{console.error(e)}catch(_){}}
+  return hasil};
+}catch(e){}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
