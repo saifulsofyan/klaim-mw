@@ -285,7 +285,7 @@ async function saveLC(){
   setTimeout(()=>go('dash'),800)
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
-// =================  (barcode -> HP pengemudi -> tanda tangan digital) =================
+// ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
 (function(){const s=document.createElement('style');s.textContent=`
 .dg{gap:4px}.dg .tl{padding:8px 1px 6px}.dg .tl .n{font-size:28px}.dg .tl b{font-size:10px}.dg .tl .u{font-size:10px}.dg .ch{font-size:10px;width:94%}
 .tk{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--ln);font-size:13.5px}.tk:last-of-type{border-bottom:0}.tk span{color:var(--m)}.tk b{text-align:right;word-break:break-word}
@@ -384,10 +384,10 @@ function qrSvg(text){
 // ---- sisi Operasi: pilih No Registrasi -> data otomatis + barcode ----
 let TTDT=null,TTDK='';
 async function vTtd(){
- head({t:'',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
- if(!ttdOk()){V.innerHTML='<div class="cd">Akun Anda tidak punya akses .</div>';return}
+ head({t:'TTD Pengemudi',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
+ if(!ttdOk()){V.innerHTML='<div class="cd">Akun Anda tidak punya akses TTD Pengemudi.</div>';return}
  const rg=await run('regs','TTD');
- V.innerHTML=`<div class="bn"><div><h2></h2><p>Pilih No Registrasi, lalu minta pengemudi scan barcode untuk tanda tangan digital.</p></div>${ic('sign',56,'#fff')}</div>
+ V.innerHTML=`<div class="bn"><div><h2>TTD PENGEMUDI</h2><p>Pilih No Registrasi, lalu minta pengemudi scan barcode untuk tanda tangan digital.</p></div>${ic('sign',56,'#fff')}</div>
 <div class="cd"><label class="f"><span class="l">No Registrasi</span><select class="in" id="ttdReg" onchange="ttdPick(this.value)"><option value="">Pilih No Registrasi</option>${opt(rg.map(r=>r.v+'|'+r.l))}</select><small>${rg.length?'Hanya nomor yang belum ditandatangani.':'Semua nomor registrasi sudah ditandatangani.'}</small></label><div id="ttdBody"></div></div>`}
 async function ttdRender(){V.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';try{await vTtd()}catch(e){toast(e.message||'Terjadi kesalahan')}}
 async function ttdPick(v){
@@ -410,8 +410,8 @@ async function ttdPoll(){
  const el=$('#ttdSt');if(!el)return;
  if(s=='signed'){
   clearInterval(TTDT);TTDK='';try{window.MODE&&MODE.stale&&MODE.stale()}catch(e){}
-  $('#ttdQr').style.display='none';el.className='qs ok';el.textContent=' sudah tersimpan';
-  el.insertAdjacentHTML('afterend','<div class="row"><button type="button" class="btn p" onclick="ttdRender()"> Lain</button></div>');
+  $('#ttdQr').style.display='none';el.className='qs ok';el.textContent='TTD pengemudi sudah tersimpan';
+  el.insertAdjacentHTML('afterend','<div class="row"><button type="button" class="btn p" onclick="ttdRender()">TTD Pengemudi Lain</button></div>');
   const cp=el.parentNode.querySelector('.row .btn.s');if(cp)cp.parentNode.remove();
  }else if(s=='expired'){
   clearInterval(TTDT);TTDK='';$('#ttdQr').style.display='none';el.className='qs er';el.textContent='Barcode sudah kedaluwarsa. Pilih ulang No Registrasi untuk membuat barcode baru.'}}
@@ -423,12 +423,12 @@ async function ttdPublic(tk){
  $('header').style.display='none';$('nav').style.display='none';
  V.innerHTML='<p style="text-align:center;color:var(--m);padding-top:20vh">Memuat data…</p>';
  let d;try{d=await raw('ttdGet',tk)}catch(e){return ttdMsg(e.message||'Gagal memuat data',/internet|koneksi/i.test(e.message||''))}
- V.innerHTML=`<div style="text-align:center;padding:18px 0 4px"><div class="lg" style="margin:0 auto 8px;width:56px;height:56px;background:var(--b)">${ic('car',34,'#fff')}</div><h2 style="margin:0;font-size:19px"></h2><p style="color:var(--m);margin:2px 0 0;font-size:13px">${esc(S.pool)}</p></div>
+ V.innerHTML=`<div style="text-align:center;padding:18px 0 4px"><div class="lg" style="margin:0 auto 8px;width:56px;height:56px;background:var(--b)">${ic('car',34,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><p style="color:var(--m);margin:2px 0 0;font-size:13px">${esc(S.pool)}</p></div>
 <div class="cd" id="ttdCard">${ttdRows(d)}</div>
 <div class="cd" id="sgCard"><span class="l">Tanda tangan di kotak ini</span><div class="sg"><canvas id="sg"></canvas><span id="sgh">Tanda tangan di sini</span></div><div class="row" style="margin-top:10px"><button type="button" class="btn s" onclick="sgInit()">Hapus</button><button type="button" class="btn p" id="sgOk" onclick="sgSend()" disabled>Simpan</button></div></div>`;
  sgInit()}
 function ttdMsg(m,retry){
- V.innerHTML=`<div style="padding-top:14vh;text-align:center"><div class="lg" style="margin:0 auto 12px;width:64px;height:64px;background:var(--b)">${ic('car',40,'#fff')}</div><h2 style="margin:0;font-size:19px"></h2><div class="cd" style="text-align:left"><div class="qs er" style="margin:0">${esc(m)}</div>${retry?'<div class="row" style="margin-top:10px"><button type="button" class="btn p" onclick="ttdPublic(TTD_Q)">Coba Lagi</button></div>':''}</div></div>`}
+ V.innerHTML=`<div style="padding-top:14vh;text-align:center"><div class="lg" style="margin:0 auto 12px;width:64px;height:64px;background:var(--b)">${ic('car',40,'#fff')}</div><h2 style="margin:0;font-size:19px">TTD Pengemudi</h2><div class="cd" style="text-align:left"><div class="qs er" style="margin:0">${esc(m)}</div>${retry?'<div class="row" style="margin-top:10px"><button type="button" class="btn p" onclick="ttdPublic(TTD_Q)">Coba Lagi</button></div>':''}</div></div>`}
 function sgInit(){
  const c=$('#sg');if(!c)return;
  const r=c.getBoundingClientRect(),k=window.devicePixelRatio||1,x=c.getContext('2d');
@@ -454,7 +454,7 @@ async function sgSend(){
   toast(m);b.disabled=false;b.textContent='Simpan'}}
 window.addEventListener('resize',()=>{if($('#sg')&&!SG.len)sgInit()});
 
-// ---- tile "" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
+// ---- tile "TTD Pengemudi" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
 function ttdTile(){
  if(P!='dash'||!ttdOk())return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
@@ -464,7 +464,7 @@ function ttdTile(){
  const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
  const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
  const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
- if(b)b.textContent='';if(ch)ch.textContent='Operasi';setT(n,'–');
+ if(b)b.textContent='TTD Pengemudi';if(ch)ch.textContent='Operasi';setT(n,'–');
  const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})}
@@ -616,18 +616,18 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
    if(a.length>1)a.forEach((x,i)=>{if(x.textContent.trim()==='Foto')x.textContent='Foto '+(i+1)})})};
  new MutationObserver(sync).observe(V,{childList:true,subtree:true});
 })();
-// ---- Tile "" di dashboard: TERLIHAT oleh semua akun (PU, Security, Bengkel, dst.), tapi hanya Operasi/admin yang bisa membukanya ----
+// ---- Tile "TTD Pengemudi" di dashboard: TERLIHAT oleh semua akun (PU, Security, Bengkel, dst.), tapi hanya Operasi/admin yang bisa membukanya ----
 ttdTile=function(){
  if(P!='dash')return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
  if(!op||op.parentNode.querySelector('[data-ttd]'))return;
  const g=op.parentNode,t=op.cloneNode(true);
  t.setAttribute('data-ttd','1');t.className=op.className.replace(/\bc\d\b/,'c7');
- t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses ')");   // tanpa akses: hanya muncul pesan
+ t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses TTD Pengemudi')");   // tanpa akses: hanya muncul pesan
  const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
  const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
  const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
- if(b)b.textContent='';if(ch)ch.textContent='Operasi';setT(n,'–');
+ if(b)b.textContent='TTD Pengemudi';if(ch)ch.textContent='Operasi';setT(n,'–');
  const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})};
@@ -953,7 +953,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
    V.innerHTML=kartu('Data belum bisa dimuat','Server Google lambat atau tidak merespons.');
    $('#rt').onclick=()=>render()}};
 }catch(e){}})();
- // ---- TAMPILAN WEB (layar lebar / komputer): menu di kiri, isi lebih besar dan dua kolom. Tampilan HP TIDAK berubah. ----
+// ---- TAMPILAN WEB (layar lebar / komputer): menu di kiri, isi lebih besar dan dua kolom. Tampilan HP TIDAK berubah. ----
 (function(){try{
  const css=`@media screen and (min-width:1000px){
 body{background:#F3F6FC}
@@ -1022,7 +1022,7 @@ body[data-p=login] #v>div{max-width:480px;margin:0 auto}
 #app form .f:has(textarea),#app form .f:has(.up),#app form .f:has(.pa){grid-column:1/-1}
 #app #dataForm>.row,#app #lcForm>.row{grid-column:1/-1;justify-content:flex-start;margin-top:6px}
 #app #dataForm>.row .btn,#app #lcForm>.row .btn{flex:0 0 220px}
-body[data-p=set] #app #v{max-width:1000px}
+body[data-p=set] #app #v>.cd{max-width:1000px}
 
 }
 @media screen and (min-width:1280px){
@@ -1038,7 +1038,7 @@ body[data-p=input] #v{row-gap:20px}
  const _go=go;go=function(p,x){setP(p);return _go.apply(this,arguments)};
  const _sl=showLogin;showLogin=function(){setP('login');return _sl.apply(this,arguments)};
 }catch(e){}})();
- // ---- LAPORAN KLAIM: data Klaim dan LC digabung dalam satu tabel (urut No Registrasi). Layar maksimal 15 baris; semua baris tetap ada di Excel / PDF / Cetak ----
+// ---- LAPORAN KLAIM: data Klaim dan LC digabung dalam satu tabel (urut No Registrasi). Layar maksimal 15 baris; semua baris tetap ada di Excel / PDF / Cetak ----
 // Berlaku untuk Rekap Harian dan Data Bulan. Angka ringkasan (Jumlah Klaim dst.) tetap menghitung Klaim saja. Rekap Bulanan tidak berubah.
 (function(){try{
  const MAXV=15;   // jumlah baris maksimal yang tampil di layar
@@ -1089,6 +1089,93 @@ body[data-p=input] #v{row-gap:20px}
   }catch(e){try{console.error(e)}catch(_){}}
   return hasil};
 }catch(e){}})();
+// ---- PETUGAS CAT: peran baru "cat". Input Bengkel = nama petugas Cat + foto saja. Input LC = nomor mobil + nama petugas Cat + foto sebelum / selesai perbaikan. ----
+// Data dari petugas Cat tetap muncul di pilihan No Registrasi, supaya bisa dilengkapi petugas Bengkel. Kolom "Nama Petugas Cat" ada di Input Bengkel dan Input LC (sebelum upload foto).
+// Daftar nama petugas Cat diisi admin di menu Pengaturan ("Petugas Cat"). Akun Cat dibuat di Pengaturan > Kelola Pengguna (peran: cat).
+(function(){try{
+ const isCat=()=>!!U&&U.peran=='cat';
+ try{RF.cat='Bengkel'}catch(e){}
+ try{if(!SF.some(x=>x[0]=='petugasCat'))SF.push(['petugasCat','Petugas Cat (NIP - Nama, satu per baris)','area'])}catch(e){}
+
+ // ----- Input Bengkel -----
+ // Semua akun: kolom "Nama Petugas Cat" sebelum foto. Akun Cat: HANYA Nama Petugas Cat + Foto Selesai Perbaikan.
+ const BF=FM.Bengkel.f;
+ if(!BF.some(x=>x[0]=='PetugasCat')){const i=BF.findIndex(x=>x[0]=='FotoSelesai');BF.splice(i<0?BF.length:i,0,['PetugasCat','Nama Petugas Cat','sel','petugasCat',0])}
+ const fs0=BF.find(x=>x[0]=='FotoSelesai')||['FotoSelesai','Foto Selesai Perbaikan','foto','',1];
+ const BCAT=[['PetugasCat','Nama Petugas Cat','sel','petugasCat',1],[fs0[0],fs0[1],fs0[2],fs0[3],1]];
+ Object.defineProperty(FM.Bengkel,'f',{get:()=>isCat()?BCAT:BF,configurable:true});
+
+ // ----- Input LC -----
+ // Semua akun: kolom "Nama Petugas Cat" sebelum foto. Akun Cat: Nomor Mobil, Nama Petugas Cat, Foto Sebelum, Foto Selesai Perbaikan.
+ let LFULL=null,LCAT=null;
+ const useLC=()=>{
+  if(!LFULL){
+   if(!LCF.some(x=>x[0]=='PetugasCat')){const i=LCF.findIndex(x=>x[0]=='FotoSebelum');LCF.splice(i<0?LCF.length:i,0,['PetugasCat','Nama Petugas Cat','sel','petugasCat',0])}
+   LFULL=LCF.slice();
+   LCAT=['NoMobil','PetugasCat','FotoSebelum','FotoSesudah'].map(k=>{const x=LFULL.find(y=>y[0]==k);return[x[0],x[1],x[2],x[3],(k=='NoMobil'||k=='PetugasCat')?1:0]})}
+  LCF.splice(0,LCF.length,...(isCat()?LCAT:LFULL))};
+ const lcOk=()=>!!U&&(U.peran=='admin'||U.peran=='bengkel'||U.peran=='cat');
+
+ // daftar nama petugas Cat kosong -> kolom nama berupa ketikan biasa
+ try{const f=fld;fld=function(a){
+  if(a&&a[0]=='PetugasCat'&&a[2]=='sel'&&!String(S.petugasCat||'').split('\n').some(x=>x.trim()))a=[a[0],a[1],'text','',a[4]];
+  return f.call(this,a)}}catch(e){}
+ // nama yang tersimpan tetap tampil walau sudah tidak ada di daftar Pengaturan
+ const SV=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+ const patch=el=>{if(el.__cat)return;el.__cat=1;Object.defineProperty(el,'value',{configurable:true,get(){return SV.get.call(this)},set(v){
+  v=v==null?'':String(v);
+  if(v&&![...this.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=v;this.appendChild(o)}
+  SV.set.call(this,v)}})};
+ const setV=(e,v)=>{if(e.tagName=='SELECT'&&v&&![...e.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=v;e.appendChild(o)}e.value=v};
+ new MutationObserver(()=>{
+  V.querySelectorAll('select[name="PetugasCat"]').forEach(patch);
+  const r=document.getElementById('ur');   // pilihan peran di Kelola Pengguna
+  if(r&&r.tagName=='SELECT'&&!r.querySelector('option[value="cat"]'))r.insertAdjacentHTML('beforeend','<option value="cat">cat (Petugas Cat: foto Input Bengkel + Input LC)</option>')
+ }).observe(V,{childList:true,subtree:true});
+
+ // Input Bengkel: data awal dari petugas Cat (belum lengkap) langsung bisa diisi, tidak terkunci
+ try{const f=pick;pick=async function(){
+  const r=await f.apply(this,arguments);
+  try{if(X=='Bengkel'){const fs=$('#fs'),st=fs&&fs.querySelector('[name="Status"]');if(fs&&(!st||!st.value))fs.disabled=false}}catch(e){}
+  return r}}catch(e){}
+
+ // menu Input Data: akun Cat melihat Input Bengkel + Input LC
+ try{const f=vInput;vInput=async function(){
+  await f.apply(this,arguments);
+  if(isCat()&&!V.querySelector('button[onclick="go(\'form\',\'LC\')"]'))V.insertAdjacentHTML('beforeend',`<button class="mc c7" onclick="go('form','LC')"><div class="ico" style="width:64px;height:64px;background:rgba(255,255,255,.65)">${ic('car',36,'var(--fg)')}</div><div><b>Input LC</b><span>Input data LC kendaraan (Bengkel)</span></div>${ic('chevr',22,'var(--fg)')}</button>`)}}catch(e){}
+
+ // Form Input LC: No Registrasi bisa dipilih ("Baru" atau nomor yang menunggu dilengkapi)
+ vLC=async function(){
+  head({t:'Input LC',s:'Bengkel - LC Kendaraan',i:'car',c:'#0E7490',back:'input'});PH={};
+  if(!lcOk()){V.innerHTML='<div class="cd">Input LC hanya bisa dibuka oleh akun Bengkel.</div>';return}
+  useLC();
+  let r=null;
+  try{r=await run('regsPlus','LC','LC')}catch(e){if(/Sesi berakhir/.test(e.message))throw e}
+  const list=(r&&r.lc&&Array.isArray(r.list))?r.list:[],reg=(r&&r.next)||await run('nextReg');
+  const hint=isCat()?'Biarkan "Baru" untuk data baru, atau pilih nomor yang sudah Anda isi untuk menambah foto.':'Biarkan "Baru" untuk input LC baru, atau pilih nomor yang menunggu untuk dilengkapi (data dari petugas Cat).';
+  V.innerHTML=`<form class="cd" id="lcForm" onsubmit="return false"><label class="f"><span class="l">Tanggal</span><input class="in" readonly value="${now()}"></label><label class="f"><span class="l">No Registrasi</span><select class="in" id="lcReg" onchange="lcPick(this.value)"><option value="">Baru - ${esc(reg)} (otomatis)</option>${list.map(x=>`<option value="${esc(x.v)}">${esc(x.l)}</option>`).join('')}</select><small>${hint}</small></label><input type="hidden" name="LanjutReg" value="">${LCF.map(fld).join('')}<button type="button" class="btn p" style="width:100%" onclick="saveLC()">${ic('save',20,'#fff')}Simpan</button></form>`};
+ window.lcPick=async function(v){
+  const f=$('#lcForm');if(!f)return;
+  const lj=f.querySelector('[name="LanjutReg"]');lj.value=v||'';
+  const kosong=()=>{f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')e.value=''});LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=[];drawPh(x[0])})};
+  kosong();
+  if(!v)return;
+  try{
+   const r=await run('getRecord','LC',v);
+   if(!r){toast('Data tidak ditemukan');return}
+   if(lj.value!==v)return;   // pilihan sudah diganti saat menunggu
+   f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')setV(e,r[e.name]||'')});
+   LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=r[x[0]]?r[x[0]].split('\n').filter(Boolean):[];drawPh(x[0])});
+  }catch(e){toast(e.message||'Gagal memanggil data')}};
+ // akun Cat: minimal satu foto (sebelum atau selesai perbaikan)
+ try{const f=saveLC;saveLC=function(){
+  if(isCat()){
+   const v=k=>{const e=$('#lcForm [name="'+k+'"]');return e?e.value.trim():''};
+   if(!v('NoMobil'))return toast('Nomor Mobil wajib diisi');
+   if(!v('PetugasCat'))return toast('Nama Petugas Cat wajib diisi');
+   if(!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return toast('Upload minimal satu foto (sebelum atau selesai perbaikan)')}
+  return f.apply(this,arguments)}}catch(e){}
+}catch(e){try{console.error(e)}catch(_){}}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
