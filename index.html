@@ -635,6 +635,260 @@ ttdTile=function(){
 // Kolomnya tetap ada di Sheet supaya data lama aman. Saat data lama dipanggil lewat Revisi Registrasi, nilai lamanya ikut tersimpan kembali (tidak terhapus).
 try{const k=FM.Klaim.f.find(x=>x[0]=='Jenis');if(k)k[4]=0}catch(e){}   // tidak wajib lagi
 try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" name="Jenis">';return f.call(this,a)}}catch(e){}   // tidak ditampilkan
+// ---- SEMUA LAPORAN (Klaim, Bengkel, PU, Operasi, LC): pilihan Rekap Harian / Rekap Bulanan / Data Bulan ----
+// Tanggal yang dipakai = tanggal input data (sama seperti dashboard & laporan sebelumnya). Laporan Frekuensi Pengemudi tidak diubah.
+(function(){
+ const SB=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+ // kategori = kolom yang dihitung per nilai; sums = kolom angka yang dijumlah (rp = rupiah, n = angka biasa)
+ const ST=['Selesai','Tunda'];
+ const CFG={
+  Klaim:{cat:'JenisMobil',pr:['Stiker','Reguler','CNG'],sums:[]},
+  Bengkel:{cat:'Status',pr:ST,sums:[['Biaya','Total Biaya','rp']]},
+  PU:{cat:'Kategori',pr:['R','SR','B','SB','KR','LC','Subkon'],sums:[['Point','Total Point','n'],['Dedaan','Total Dedaan','rp']]},
+  Operasi:{cat:'Tindakan',pr:['Stop Operasi','Operasional Kembali'],sums:[]},
+  LC:{cat:'Status',pr:ST,sums:[['Biaya','Total Biaya','rp']]}};
+ const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+ const dt=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):null};
+ const dKey=r=>String(r.Tanggal||'').slice(0,10);
+ const dShort=s=>{const d=dt(s);return d?d.getDate()+' '+SB[d.getMonth()]+' '+d.getFullYear():String(s)};
+ const dLong=s=>{const d=dt(s);return d?HR[d.getDay()]+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear():String(s)};
+ const rp=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
+ const val=(v,k)=>{if(v==null)return 0;if(k=='rp'){const t=String(v).replace(/\D/g,'');return t?+t:0}const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:0};
+ const fmtS=(n,k)=>k=='rp'?rp(n):String(+n.toFixed(2));
+ const catOf=(r,c)=>String(r[c]==null?'':r[c]).trim()||'-';
+ const catList=(rows,c,pr)=>{const s=[];rows.forEach(r=>{const k=catOf(r,c);if(s.indexOf(k)<0)s.push(k)});return s.sort((a,b)=>{const ia=pr.indexOf(a),ib=pr.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b)})};
+ let mode='data',day='',seq=0;
+ const st=document.createElement('style');
+ st.textContent='.lcm{display:flex;gap:4px;background:#EEF2FA;border-radius:12px;padding:3px;margin:10px 0}.lcm button{flex:1;border:0;border-radius:10px;padding:10px 2px;font:inherit;font-size:12.5px;font-weight:700;color:#5B6478;background:transparent}.lcm button.on{background:var(--b,#0B5ED7);color:#fff}'
+  +'.lcn{display:flex;gap:6px;align-items:center}.lcn .in{flex:1;margin:0;min-width:0}.lcn button{flex:none;width:44px;height:44px;border:1px solid #C9CEDD;border-radius:10px;background:#fff;font-size:20px;font-weight:700;color:var(--b,#0B5ED7)}'
+  +'.lcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin-bottom:12px}.lcs div{background:#F4F8FE;border-radius:10px;padding:8px 6px;text-align:center}.lcs .w{grid-column:1/-1}.lcs b{display:block;font-size:17px;color:var(--b,#0B5ED7)}.lcs span{font-size:11px;color:#5B6478}'
+  +'tr.lct td{font-weight:800;background:#E2EEFF!important}';
+ document.head.appendChild(st);
+ async function lapX(){
+  const lr=$('#lr');if(!lr)return;const my=++seq,T=LT,cfg=CFG[T],nm=(typeof NM=='object'&&NM[T])||T;
+  const per=$('#lb')&&$('#lb').closest('.cd');
+  if(per)per.style.display=mode=='hari'?'none':'';   // saat Rekap Harian, bulan & tahun ikut tanggal
+  if(!day)day=ymd(new Date());
+  let m;
+  if(mode=='hari')m=day.slice(0,7);else m=$('#ly').value+'-'+String($('#lb').value).padStart(2,'0');
+  LM=m;
+  if(mode=='hari'){const y=$('#ly'),b=$('#lb');if(y&&[...y.options].some(o=>o.value==m.slice(0,4)))y.value=m.slice(0,4);if(b)b.value=String(+m.slice(5))}
+  lr.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';
+  let all;
+  try{all=await run('report',T,m)||[]}catch(e){if(my===seq){lr.innerHTML='';toast(e.message||'Gagal memuat laporan')}return}
+  if(my!==seq)return;
+  const cats=catList(all,cfg.cat,cfg.pr);
+  const cnt=(rs,k)=>rs.filter(r=>catOf(r,cfg.cat)==k).length;
+  let head=null,title,sub,body;
+  if(mode=='hari'){
+   const rows=all.filter(r=>dKey(r)==day);LP=day;LR=rows;LH=null;title='Rekap '+nm+' Harian';sub=dLong(day);
+   const ss=catList(rows,cfg.cat,cfg.pr);
+   body=(rows.length?`<div class="lcs"><div><b>${rows.length}</b><span>Jumlah ${esc(nm)}</span></div>${ss.map(k=>`<div><b>${cnt(rows,k)}</b><span>${esc(k)}</span></div>`).join('')}${cfg.sums.map(([c,l,k])=>`<div class="w"><b>${fmtS(rows.reduce((s,r)=>s+val(r[c],k),0),k)}</b><span>${esc(l)}</span></div>`).join('')}</div>`:'')+tbl(rows,null);
+  }else if(mode=='rekap'){
+   title='Rekap '+nm+' Bulan '+fm(m);sub='Periode : '+fm(m)+' · per tanggal';LP='rekap-'+m;
+   const days=[...new Set(all.map(dKey))].sort();
+   head=['Tanggal','Jumlah '+nm].concat(cats,cfg.sums.map(x=>x[1]));
+   const line=(lbl,rs)=>{const o={Tanggal:lbl,Jumlah:rs.length};cats.forEach(k=>{o['C_'+k]=cnt(rs,k)});cfg.sums.forEach(([c,l,k])=>{o['S_'+c]=fmtS(rs.reduce((s,r)=>s+val(r[c],k),0),k)});return o};
+   const rows=days.map(d=>line(dShort(d),all.filter(r=>dKey(r)==d)));
+   if(rows.length)rows.push(line('TOTAL',all));
+   LR=rows;LH=head;body=tbl(rows,head);
+  }else{
+   LP=m;LR=all;LH=null;title='Laporan '+nm;sub='Periode : '+fm(m);body=tbl(all,null);
+  }
+  const seg=[['hari','Rekap Harian'],['rekap','Rekap Bulanan'],['data','Data Bulan']].map(([k,t])=>`<button type="button" class="${mode==k?'on':''}" onclick="lapMode('${k}')">${t}</button>`).join('');
+  const nav=mode=='hari'?`<div class="f np"><span class="l">Tanggal</span><div class="lcn"><button type="button" aria-label="Hari sebelumnya" onclick="lapStep(-1)">‹</button><input class="in" type="date" id="lcd" value="${esc(day)}" onchange="lapDay(this.value)"><button type="button" aria-label="Hari berikutnya" onclick="lapStep(1)">›</button></div></div>`:'';
+  lr.innerHTML=`<div class="cd"><div class="hd"><div class="ico c2">${ic('file',22,'var(--fg)')}</div><div style="flex:1"><h3>${esc(title)}</h3><small>${esc(sub)}</small></div></div><div class="lcm np">${seg}</div>${nav}<div class="row np" style="margin-top:10px"><button class="btn" style="background:#0F7A3D;color:#fff" onclick="csv()">Excel</button><button class="btn" style="background:#D92027;color:#fff" onclick="window.print()">PDF</button><button class="btn" style="background:#6B7285;color:#fff" onclick="window.print()">Cetak</button></div></div><div class="cd">${body}</div>`;
+  if(mode=='rekap'&&LR.length){const t=lr.querySelector('tbody tr:last-child');if(t)t.classList.add('lct')}}
+ window.lapMode=k=>{mode=k;return showLap()};
+ window.lapDay=v=>{if(/^\d{4}-\d{2}-\d{2}$/.test(v)){day=v;return showLap()}};
+ window.lapStep=n=>{const d=dt(day)||new Date();d.setDate(d.getDate()+n);day=ymd(d);return showLap()};
+ try{const f=showLap;showLap=function(){return typeof LT!='undefined'&&CFG[LT]?lapX():f.apply(this,arguments)}}catch(e){}
+})();
+// ---- UNDUH EXCEL (.xlsx) & PDF ASLI: bisa dibuka & dibagikan dari HP ----
+// Tombol "Excel" dan "PDF" di semua halaman Laporan membuat file sungguhan (bukan CSV / menu cetak),
+// lalu di HP dikirim lewat menu Bagikan (Simpan ke File, WhatsApp, Drive, dst). Tanpa pustaka luar.
+(function(){
+ const enc=new TextEncoder(),csv0=(typeof csv=='function')?csv:null;
+ // ===== ZIP (tanpa kompresi) =====
+ const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+ const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=crcT[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+ function zip(files){
+  const d=new Date(),dT=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),dD=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  const parts=[],cen=[];let off=0;
+  files.forEach(([n,s])=>{
+   const b=enc.encode(s),nb=enc.encode(n),crc=crc32(b),h=new DataView(new ArrayBuffer(30)),c=new DataView(new ArrayBuffer(46));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(10,dT,true);h.setUint16(12,dD,true);h.setUint32(14,crc,true);h.setUint32(18,b.length,true);h.setUint32(22,b.length,true);h.setUint16(26,nb.length,true);
+   parts.push(new Uint8Array(h.buffer),nb,b);
+   c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(12,dT,true);c.setUint16(14,dD,true);c.setUint32(16,crc,true);c.setUint32(20,b.length,true);c.setUint32(24,b.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+b.length});
+  const cl=cen.reduce((s,x)=>s+x.length,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cl,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+ // ===== EXCEL =====
+ const bad=/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
+ const xe=s=>String(s).replace(bad,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const colL=i=>{let s='';for(i++;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s};
+ const maxLine=v=>String(v==null?'':v).split('\n').reduce((m,x)=>Math.max(m,x.length),0);
+ function xlsx(title,sub,top,head,rows){
+  const nc=head.length,R=[];let r=0;
+  const cs=(c,v,s)=>`<c r="${colL(c)}${r}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+  const cn=(c,v,s)=>`<c r="${colL(c)}${r}" s="${s}"><v>${v}</v></c>`;
+  const add=a=>{R.push(`<row r="${r}">${a.join('')}</row>`)};
+  r++;add([cs(0,title,4)]);
+  if(sub){r++;add([cs(0,sub,1)])}
+  top.forEach(([l,v])=>{r++;add([cs(0,l,1),cs(1,v,3)])});
+  r++;r++;const hr=r;add(head.map((h,i)=>cs(i,h,2)));
+  rows.forEach(row=>{r++;const tot=String(row[0])=='TOTAL';add(head.map((_,i)=>{const v=row[i];return typeof v=='number'&&isFinite(v)?cn(i,v,tot?5:3):cs(i,v==null?'':v,tot?5:3)}))});
+  const cols=head.map((h,i)=>{let m=maxLine(h);rows.forEach(x=>{m=Math.max(m,Math.min(maxLine(x[i]),45))});return`<col min="${i+1}" max="${i+1}" width="${Math.min(60,Math.max(9,m+3))}" customWidth="1"/>`}).join('');
+  const M='http://schemas.openxmlformats.org/spreadsheetml/2006/main',RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships',H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const sheet=H+`<worksheet xmlns="${M}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${hr}" topLeftCell="A${hr+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${R.join('')}</sheetData></worksheet>`;
+  const bd='<border><left style="thin"><color rgb="FFBFC6D6"/></left><right style="thin"><color rgb="FFBFC6D6"/></right><top style="thin"><color rgb="FFBFC6D6"/></top><bottom style="thin"><color rgb="FFBFC6D6"/></bottom><diagonal/></border>';
+  const fl=c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`;
+  const styles=H+`<styleSheet xmlns="${M}"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fl('FFDCE8FA')}${fl('FFE2EEFF')}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${bd}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const nm=(String(title).replace(/[\[\]:*?\/\\]/g,'').trim().slice(0,31))||'Laporan';
+  return zip([
+   ['[Content_Types].xml',H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+   ['_rels/.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml',H+`<workbook xmlns="${M}" xmlns:r="${RL}"><sheets><sheet name="${xe(nm)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+   ['xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',styles],['xl/worksheets/sheet1.xml',sheet]])}
+ // ===== PDF =====
+ // lebar huruf Helvetica (per 1000), kode 32..126
+ const HW=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+ const W1252={'€':128,'‚':130,'ƒ':131,'„':132,'…':133,'†':134,'‡':135,'ˆ':136,'‰':137,'Š':138,'‹':139,'Œ':140,'Ž':142,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'˜':152,'™':153,'š':154,'›':155,'œ':156,'ž':158,'Ÿ':159};
+ const pc=ch=>{const c=ch.charCodeAt(0);if(c>=32&&c<127)return c;if(c>=160&&c<256)return c;if(W1252[ch])return W1252[ch];if(c==9||c==10||c==13)return 32;return 63};
+ const cwid=k=>k>=32&&k<127?HW[k-32]:(k==133||k==151?1000:k==149?350:556);
+ const tw=(s,fs,b)=>{let w=0;for(const ch of s)w+=cwid(pc(ch));return w*fs/1000*(b?1.07:1)};
+ const hex=s=>{let o='';for(const ch of s){const k=pc(ch);o+=(k<16?'0':'')+k.toString(16)}return'<'+o+'>'};
+ const nf=n=>String(+(+n).toFixed(2));
+ const isUrl=x=>/^https?:/i.test(x);
+ // isi sel -> paragraf -> kata (URL jadi tulisan "Foto", bisa diketuk)
+ function paras(v){
+  const ls=String(v==null?'':v).replace(bad,'').split('\n'),nu=ls.filter(x=>isUrl(x.trim())).length;let k=0;
+  return ls.map(x=>{x=x.trim();if(isUrl(x)){k++;const u=x;return(nu>1?['Foto',String(k)]:['Foto']).map(t=>({t,u}))}return x?x.split(/\s+/).map(t=>({t})):[]})}
+ function wrap(ps,mw,fs,b,maxL){
+  const L=[],sp=tw(' ',fs,b);
+  for(const p of ps){
+   if(!p.length){L.push([]);continue}
+   let cur=[],cwd=0;const flush=()=>{L.push(cur);cur=[];cwd=0};
+   for(const tk of p){
+    let parts=[tk];
+    if(tw(tk.t,fs,b)>mw){parts=[];let s='';for(const ch of tk.t){if(s&&tw(s+ch,fs,b)>mw){parts.push({t:s,u:tk.u});s=ch}else s+=ch}if(s)parts.push({t:s,u:tk.u})}
+    parts.forEach((pt,i)=>{const w=tw(pt.t,fs,b);if(cur.length&&cwd+sp+w>mw)flush();cwd+=(cur.length?sp:0)+w;cur.push(pt);if(i<parts.length-1)flush()});
+    }
+   flush()}
+  if(maxL&&L.length>maxL){L.length=maxL;L[maxL-1]=L[maxL-1].concat([{t:'...'}])}
+  return L}
+ function pdf(title,sub,top,head,rows){
+  const nc=head.length,A3=nc>14,PW=A3?1191:842,PH=A3?842:595,M=30,AV=PW-2*M,px=3,py=2.5,MAXL=25;
+  const HP=head.map(h=>paras(h)),RP=rows.map(r=>head.map((_,i)=>paras(r[i])));
+  let fs=9,wmin,wmax;
+  for(;;){
+   wmin=[];wmax=[];
+   for(let i=0;i<nc;i++){
+    let mn=0,mx=0;
+    const see=(ps,b)=>ps.forEach(p=>{let tot=0;p.forEach((t,j)=>{const w=tw(t.t,fs,b);mn=Math.max(mn,w);tot+=w+(j?tw(' ',fs,b):0)});mx=Math.max(mx,tot)});
+    see(HP[i],true);RP.forEach(r=>see(r[i],false));
+    wmin.push(Math.min(mn,110)+2*px);wmax.push(Math.max(Math.min(mx,260)+2*px,Math.min(mn,110)+2*px))}
+   if(wmin.reduce((a,b)=>a+b,0)<=AV||fs<=4.5)break;fs-=0.5}
+  const smin=wmin.reduce((a,b)=>a+b,0);let W;
+  if(smin>=AV)W=wmin.map(w=>w*AV/smin);
+  else{const ex=AV-smin,need=wmax.reduce((a,b,i)=>a+b-wmin[i],0),sm=wmax.reduce((a,b)=>a+b,0);
+   W=need<=ex?wmax.map(w=>w+(ex-need)*w/sm):wmin.map((w,i)=>w+ex*(wmax[i]-wmin[i])/need)}
+  const X=[];W.reduce((a,w,i)=>(X[i]=a,a+w),M);
+  const lh=fs*1.25,mk=(ps,b)=>{const ls=ps.map((p,i)=>wrap(p,W[i]-2*px,fs,b,MAXL));const n=Math.max(1,...ls.map(l=>l.length));return{ls,h:n*lh+2*py}};
+  const hd=mk(HP,true),rw=RP.map(r=>mk(r,false));
+  // judul + ringkasan (halaman 1)
+  const topL=[];
+  topL.push({t:'Monitoring KLAIM MW - Pool Margasatwa',fs:8,b:0,gap:11});
+  topL.push({t:title,fs:15,b:1,gap:19});
+  if(sub)topL.push({t:sub,fs:10,b:0,gap:14});
+  if(top.length){const sw=wrap([top.map(([l,v])=>l+': '+v).join('   |   ').split(/\s+/).map(t=>({t}))],AV,9,true,6);sw.forEach(l=>topL.push({t:l.map(x=>x.t).join(' '),fs:9,b:1,gap:12}))}
+  const FOOT=M+14;let pages=[],pg=null,y=0,hh=0;
+  const newPage=first=>{pg={items:[]};pages.push(pg);y=PH-M;if(first){topL.forEach(l=>{y-=l.gap});y-=6}pg.items.push({r:hd,hdr:1,y});y-=hd.h};
+  newPage(true);
+  rw.forEach((r,i)=>{if(y-r.h<FOOT)newPage(false);pg.items.push({r,y,i});y-=r.h});
+  // gambar
+  const objs=[],n=pages.length,when=new Date().toLocaleString('id-ID');
+  objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+  objs.push('<< /Type /Pages /Kids ['+pages.map((_,i)=>(5+i*2)+' 0 R').join(' ')+'] /Count '+n+' >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+  const annots=[];
+  pages.forEach((p,pi)=>{
+   let c='',links=[];
+   const txt=(f,s,x,yy,t)=>{c+='BT /'+f+' '+nf(s)+' Tf 1 0 0 1 '+nf(x)+' '+nf(yy)+' Tm '+hex(t)+' Tj ET\n'};
+   if(pi==0){let yy=PH-M;topL.forEach(l=>{yy-=l.gap;c+=l.fs==8?'0.4 g\n':'0 g\n';txt(l.b?'F2':'F1',l.fs,M,yy,l.t)});c+='0 g\n'}
+   p.items.forEach(it=>{
+    const r=it.r,top=it.y,bottom=top-r.h;
+    for(let i=0;i<nc;i++){
+     const isT=!it.hdr&&String(rows[it.i][0])=='TOTAL';
+     if(it.hdr)c+='0.86 0.91 0.98 rg\n';else if(isT)c+='0.89 0.93 1 rg\n';else if(it.i%2)c+='0.97 0.98 1 rg\n';else c+='1 g\n';
+     c+=nf(X[i])+' '+nf(bottom)+' '+nf(W[i])+' '+nf(r.h)+' re f\n';
+     c+='0.75 G 0.5 w '+nf(X[i])+' '+nf(bottom)+' '+nf(W[i])+' '+nf(r.h)+' re S\n';
+     const bold=it.hdr||isT;
+     r.ls[i].forEach((ln,j)=>{
+      let x=X[i]+px;const by=top-py-fs*0.9-j*lh,sp=tw(' ',fs,bold);
+      if(it.hdr&&ln.length){const lw=ln.reduce((a,t)=>a+tw(t.t,fs,true),0)+sp*(ln.length-1);x=X[i]+Math.max(px,(W[i]-lw)/2)}
+      ln.forEach(tk=>{const w=tw(tk.t,fs,bold);
+       c+=tk.u?'0.05 0.37 0.84 rg\n':'0 g\n';
+       txt(bold?'F2':'F1',fs,x,by,tk.t);
+       if(tk.u)links.push([x,by-2,x+w,by+fs,tk.u]);
+       x+=w+sp})})}});
+   c+='0.4 g\n';txt('F1',7,M,M-4,'Dicetak: '+when);txt('F1',7,PW-M-60,M-4,'Halaman '+(pi+1)+' / '+n);
+   const ids=links.map(l=>{const id=5+n*2+annots.length;annots.push('<< /Type /Annot /Subtype /Link /Rect ['+l.slice(0,4).map(nf).join(' ')+'] /Border [0 0 0] /A << /S /URI /URI ('+encodeURI(l[4]).replace(/\(/g,'%28').replace(/\)/g,'%29').replace(/\\/g,'%5C')+') >> >>');return id+' 0 R'});
+   objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+(6+pi*2)+' 0 R'+(ids.length?' /Annots ['+ids.join(' ')+']':'')+' >>');
+   objs.push('<< /Length '+c.length+' >>\nstream\n'+c+'endstream')});
+  annots.forEach(a=>objs.push(a));
+  const ti=objs.length+1;
+  objs.push('<< /Title <FEFF'+Array.from(title).map(ch=>ch.charCodeAt(0).toString(16).padStart(4,'0')).join('')+'> /Producer (Monitoring KLAIM MW) >>');
+  let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';const off=[];
+  objs.forEach((b,i)=>{off.push(out.length);out+=(i+1)+' 0 obj\n'+b+'\nendobj\n'});
+  const xr=out.length;
+  out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R /Info '+ti+' 0 R >>\nstartxref\n'+xr+'\n%%EOF';
+  const u=new Uint8Array(out.length);for(let i=0;i<out.length;i++)u[i]=out.charCodeAt(i)&255;
+  return new Blob([u],{type:'application/pdf'})}
+ // ===== ambil data laporan yang sedang tampil =====
+ function ambil(){
+  if(typeof LR=='undefined'||!LR||!LR.length)return null;
+  const h0=(typeof LH!='undefined'&&LH)?LH.slice():Object.keys(LR[0]);
+  const rows=LR.map(r=>Object.values(r).map(v=>v==null?'':v));
+  const nc=rows.reduce((m,r)=>Math.max(m,r.length),h0.length),head=h0.concat(Array(nc-h0.length).fill(''));
+  const hd=document.querySelector('#lr .hd'),g=s=>{const e=hd&&hd.querySelector(s);return e?e.textContent.trim():''};
+  const top=[...document.querySelectorAll('#lr .lcs div')].map(d=>{const b=d.querySelector('b'),s=d.querySelector('span');return[s?s.textContent.trim():'',b?b.textContent.trim():'']}).filter(x=>x[0]);
+  return{head,rows,top,title:g('h3')||('Laporan '+((typeof NM=='object'&&NM[LT])||LT)),sub:g('small')}}
+ // ===== kirim ke HP (menu Bagikan) atau unduh =====
+ const mob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/i.test(navigator.platform));
+ let busy=false;
+ function kirim(blob,name){
+  const file=new File([blob],name,{type:blob.type});
+  if(mob&&navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   busy=true;
+   navigator.share({files:[file],title:name}).then(()=>{busy=false},e=>{busy=false;if(e&&e.name=='AbortError')return;turun(blob,name)});
+   return}
+  turun(blob,name)}
+ function turun(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.style.display='none';document.body.appendChild(a);a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},8000);
+  toast('File '+name+' sudah diunduh. Cek folder Download / aplikasi File.')}
+ function unduh(jenis){
+  if(busy)return;
+  try{
+   const d=ambil();if(!d)return toast('Belum ada data untuk diunduh');
+   const nm='laporan-'+LT+'-'+LP+(jenis=='pdf'?'.pdf':'.xlsx');
+   kirim(jenis=='pdf'?pdf(d.title,d.sub,d.top,d.head,d.rows):xlsx(d.title,d.sub,d.top,d.head,d.rows),nm)}
+  catch(e){
+   try{console.error(e)}catch(_){}
+   toast('Gagal membuat file '+(jenis=='pdf'?'PDF':'Excel')+(jenis=='pdf'?', coba tombol Cetak':', file CSV diunduh'));
+   if(jenis!='pdf'&&csv0){try{csv0()}catch(_){}}}}
+ window.unduhLaporan={xlsx,pdf,ambil,unduh};
+ document.addEventListener('click',e=>{
+  const b=e.target&&e.target.closest?e.target.closest('#lr button'):null;if(!b)return;
+  const t=(b.textContent||'').trim().toLowerCase();
+  if(t!='excel'&&t!='pdf')return;
+  e.preventDefault();e.stopImmediatePropagation();unduh(t=='pdf'?'pdf':'xlsx')},true);
+ try{csv=function(){unduh('xlsx')}}catch(e){}
+})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
