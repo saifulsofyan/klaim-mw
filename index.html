@@ -1167,25 +1167,34 @@ body[data-p=input] #v{row-gap:20px}
   head({t:'Input LC',s:'Bengkel - LC Kendaraan',i:'car',c:'#0E7490',back:'input'});PH={};
   if(!lcOk()){V.innerHTML='<div class="cd">Input LC hanya bisa dibuka oleh akun Bengkel.</div>';return}
   useLC();
-  let r=null;
-  try{r=await run('regsPlus','LC','LC')}catch(e){if(/Sesi berakhir/.test(e.message))throw e}
-  const list=(r&&r.lc&&Array.isArray(r.list))?r.list:[],reg=(r&&r.next)||await run('nextReg');
+  let r=null,err='';
+  try{r=await run('regsPlus','LC','LC')}catch(e){if(/Sesi berakhir/.test(e.message))throw e;err=e.message||'gagal'}
+  const okL=!!(r&&r.lc&&Array.isArray(r.list)),list=okL?r.list:[];
+  const reg=(r&&r.next)||await run('nextReg').catch(()=>'otomatis');
+  // peringatan yang TERLIHAT bila daftar data petugas Cat gagal dimuat (jangan diam-diam kosong)
+  const note=!okL?`<div class="info" id="lcNote" data-w="1" style="margin:0 0 12px;grid-column:1/-1;background:#FFF4E5;color:#8A4B00">${err?'Daftar data dari petugas Cat belum bisa dimuat ('+esc(err)+'). Server Google mungkin sedang lambat.':'Daftar data dari petugas Cat belum tersedia: Code.gs di Apps Script belum versi terbaru (belum di-deploy).'}<button type="button" class="btn s" style="margin-top:8px;width:100%" onclick="go('form','LC')">Coba lagi</button></div>`
+   :(list.length&&!isCat()?`<div class="info" id="lcNote" style="margin:0 0 12px;grid-column:1/-1">Ada <b>${list.length}</b> data LC dari petugas Cat yang menunggu dilengkapi.</div>`:'');
   const hint=isCat()?'Biarkan "Baru" untuk data baru, atau pilih nomor yang sudah Anda isi untuk menambah foto.':'Biarkan "Baru" untuk input LC baru, atau pilih nomor yang menunggu untuk dilengkapi (data dari petugas Cat).';
-  V.innerHTML=`<form class="cd" id="lcForm" onsubmit="return false"><label class="f"><span class="l">Tanggal</span><input class="in" readonly value="${now()}"></label><label class="f"><span class="l">No Registrasi</span><select class="in" id="lcReg" onchange="lcPick(this.value)"><option value="">Baru - ${esc(reg)} (otomatis)</option>${list.map(x=>`<option value="${esc(x.v)}">${esc(x.l)}</option>`).join('')}</select><small>${hint}</small></label><input type="hidden" name="LanjutReg" value="">${LCF.map(fld).join('')}<button type="button" class="btn p" style="width:100%" onclick="saveLC()">${ic('save',20,'#fff')}Simpan</button></form>`};
+  V.innerHTML=`<form class="cd" id="lcForm" onsubmit="return false">${note}<label class="f"><span class="l">Tanggal</span><input class="in" readonly value="${now()}"></label><label class="f"><span class="l">No Registrasi</span><select class="in" id="lcReg" onchange="lcPick(this.value)"><option value="">Baru - ${esc(reg)} (otomatis)</option>${list.map(x=>`<option value="${esc(x.v)}">${esc(x.l)}</option>`).join('')}</select><small>${hint}</small></label><input type="hidden" name="LanjutReg" value="">${LCF.map(fld).join('')}<button type="button" class="btn p" style="width:100%" onclick="saveLC()">${ic('save',20,'#fff')}Simpan</button></form>`;
+  // petugas Bengkel / admin: data pertama dari petugas Cat langsung ditampilkan (nomor mobil, nama petugas Cat, foto)
+  if(okL&&list.length&&!isCat()){const sl=$('#lcReg');if(sl){sl.value=list[0].v;await lcPick(list[0].v)}}};
  window.lcPick=async function(v){
   const f=$('#lcForm');if(!f)return;
   const lj=f.querySelector('[name="LanjutReg"]');lj.value=v||'';
   const kosong=()=>{f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')e.value=''});LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=[];drawPh(x[0])});autoFix(f)};
   kosong();
-  if(!v)return;
+  const nt=$('#lcNote'),setNote=h=>{if(nt&&!nt.dataset.w)nt.innerHTML=h},nL=($('#lcReg')?$('#lcReg').options.length:1)-1;
+  if(!v){setNote('Ada <b>'+nL+'</b> data LC dari petugas Cat yang menunggu dilengkapi. Pilih nomornya di No Registrasi.');return}
+  setNote('Memuat data <b>'+esc(v)+'</b> dari petugas Cat…');
   try{
    const r=await run('getRecord','LC',v);
-   if(!r){toast('Data tidak ditemukan');return}
+   if(!r){toast('Data tidak ditemukan');setNote('Data '+esc(v)+' tidak ditemukan.');return}
    if(lj.value!==v)return;   // pilihan sudah diganti saat menunggu
    f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')setV(e,r[e.name]||'')});
    LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=r[x[0]]?r[x[0]].split('\n').filter(Boolean):[];drawPh(x[0])});
-   autoFix(f)
-  }catch(e){toast(e.message||'Gagal memanggil data')}};
+   autoFix(f);
+   setNote(isCat()?'Menampilkan data <b>'+esc(v)+'</b>. Tambahkan foto lalu Simpan.':'Menampilkan data dari petugas Cat: <b>'+esc(v)+'</b>. Lengkapi data lalu Simpan. Untuk input LC baru, pilih "Baru" di No Registrasi.')
+  }catch(e){toast(e.message||'Gagal memanggil data');setNote('Data '+esc(v)+' belum bisa dimuat. Pilih nomornya lagi di No Registrasi.')}};
  // akun Cat: nomor mobil + minimal satu foto (sebelum atau selesai perbaikan), lalu bisa langsung Simpan
  try{const f=saveLC;saveLC=function(){
   if(isCat()){
