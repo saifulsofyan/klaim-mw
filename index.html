@@ -636,7 +636,7 @@ ttdTile=function(){
 try{const k=FM.Klaim.f.find(x=>x[0]=='Jenis');if(k)k[4]=0}catch(e){}   // tidak wajib lagi
 try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" name="Jenis">';return f.call(this,a)}}catch(e){}   // tidak ditampilkan
 // ---- SEMUA LAPORAN (Klaim, Bengkel, PU, Operasi, LC): pilihan Rekap Harian / Rekap Bulanan / Data Bulan ----
-// Tanggal yang dipakai = tanggal input data (sama seperti dashboard & laporan sebelumnya). Laporan Frekuensi Pengemudi tidak diubah.
+// Tanggal yang dipakai = tanggal input data (sama seperti dashboard & laporan sebelumnya). Pengecualian: Rekap Harian Laporan Klaim memakai TANGGAL KEJADIAN. Laporan Frekuensi Pengemudi tidak diubah.
 (function(){
  const SB=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
  // kategori = kolom yang dihitung per nilai; sums = kolom angka yang dijumlah (rp = rupiah, n = angka biasa)
@@ -650,6 +650,8 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
  const dt=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):null};
  const dKey=r=>String(r.Tanggal||'').slice(0,10);
+ const kKey=r=>{const k=String(r.TglKejadian||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dKey(r)};   // Klaim: tanggal kejadian (kosong -> tanggal input)
+ const nextM=m=>{const y=+m.slice(0,4),mo=+m.slice(5);return mo==12?(y+1)+'-01':y+'-'+pad(mo+1)};
  const dShort=s=>{const d=dt(s);return d?d.getDate()+' '+SB[d.getMonth()]+' '+d.getFullYear():String(s)};
  const dLong=s=>{const d=dt(s);return d?HR[d.getDay()]+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear():String(s)};
  const rp=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
@@ -674,14 +676,15 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   LM=m;
   if(mode=='hari'){const y=$('#ly'),b=$('#lb');if(y&&[...y.options].some(o=>o.value==m.slice(0,4)))y.value=m.slice(0,4);if(b)b.value=String(+m.slice(5))}
   lr.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';
-  let all;
-  try{all=await run('report',T,m)||[]}catch(e){if(my===seq){lr.innerHTML='';toast(e.message||'Gagal memuat laporan')}return}
+  let all,ext=[];
+  try{const kj=mode=='hari'&&T=='Klaim';   // Rekap Harian Klaim: kejadian bulan ini bisa baru diinput di bulan berikutnya
+   const rs=await Promise.all([run('report',T,m)].concat(kj?[run('report',T,nextM(m)).catch(()=>[])]:[]));all=rs[0]||[];ext=rs[1]||[]}catch(e){if(my===seq){lr.innerHTML='';toast(e.message||'Gagal memuat laporan')}return}
   if(my!==seq)return;
   const cats=catList(all,cfg.cat,cfg.pr);
   const cnt=(rs,k)=>rs.filter(r=>catOf(r,cfg.cat)==k).length;
   let head=null,title,sub,body;
   if(mode=='hari'){
-   const rows=all.filter(r=>dKey(r)==day);LP=day;LR=rows;LH=null;title='Rekap '+nm+' Harian';sub=dLong(day);
+   const rows=T=='Klaim'?all.concat(ext).filter(r=>kKey(r)==day):all.filter(r=>dKey(r)==day);LP=day;LR=rows;LH=null;title='Rekap '+nm+' Harian';sub=dLong(day);
    const ss=catList(rows,cfg.cat,cfg.pr);
    body=(rows.length?`<div class="lcs"><div><b>${rows.length}</b><span>Jumlah ${esc(nm)}</span></div>${ss.map(k=>`<div><b>${cnt(rows,k)}</b><span>${esc(k)}</span></div>`).join('')}${cfg.sums.map(([c,l,k])=>`<div class="w"><b>${fmtS(rows.reduce((s,r)=>s+val(r[c],k),0),k)}</b><span>${esc(l)}</span></div>`).join('')}</div>`:'')+tbl(rows,null);
   }else if(mode=='rekap'){
@@ -1039,7 +1042,7 @@ body[data-p=input] #v{row-gap:20px}
  const _sl=showLogin;showLogin=function(){setP('login');return _sl.apply(this,arguments)};
 }catch(e){}})();
 // ---- LAPORAN KLAIM: data Klaim dan LC digabung dalam satu tabel (urut No Registrasi). Layar maksimal 15 baris; semua baris tetap ada di Excel / PDF / Cetak ----
-// Berlaku untuk Rekap Harian dan Data Bulan. Angka ringkasan (Jumlah Klaim dst.) tetap menghitung Klaim saja. Rekap Bulanan tidak berubah.
+// Berlaku untuk Rekap Harian dan Data Bulan. Rekap Harian memakai TANGGAL KEJADIAN (Klaim: Tanggal Kejadian, LC: Tanggal Pekerjaan LC; kosong -> tanggal input). Angka ringkasan (Jumlah Klaim dst.) tetap menghitung Klaim saja. Rekap Bulanan tidak berubah.
 (function(){try{
  const MAXV=15;   // jumlah baris maksimal yang tampil di layar
  const KOL=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail','WA','Foto','Petugas','Lokasi','LawanTabrak'];
@@ -1048,10 +1051,12 @@ body[data-p=input] #v{row-gap:20px}
  document.head.appendChild(st);
  const dk=r=>String((r&&r.Tanggal)||'').slice(0,10);
  const nr=r=>String((r&&r.NoReg)||'');
+ const lcKey=x=>{const k=String((x&&x.TglPekerjaan)||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dk(x)};   // LC: tanggal kejadian = Tanggal Pekerjaan LC (kosong -> tanggal input)
+ const nextM=m=>{const y=+m.slice(0,4),mo=+m.slice(5);return mo==12?(y+1)+'-01':y+'-'+String(mo+1).padStart(2,'0')};
  // satu baris LC -> bentuk kolom Klaim (kolom yang tidak ada di LC dikosongkan)
  const ubah=(x,keys)=>{
   const o={};keys.forEach(k=>{o[k]=''});
-  o.NoReg=x.NoReg||'';o.Tanggal=x.Tanggal||'';o.Bulan=x.Bulan||'';
+  o.NoReg=x.NoReg||'';o.Tanggal=x.Tanggal||'';o.Bulan=x.Bulan||'';o.TglKejadian=lcKey(x);
   o.JenisMobil=x.JenisKendaraan||'';o.NoMobil=x.NoMobil||'';o.Jenis='LC';o.Detail=x.Detail||'';
   o.Foto=[x.FotoSebelum,x.FotoSesudah].filter(v=>v&&String(v).trim()).join('\n');
   return o};
@@ -1071,38 +1076,44 @@ body[data-p=input] #v{row-gap:20px}
    const m=LM;
    info(body,'Menggabungkan data LC…');
    let lc=null;
-   try{lc=(await run('report','LC',m))||[]}catch(e){lc=null}
+   try{const rs=await Promise.all([run('report','LC',m)].concat(hari?[run('report','LC',nextM(m)).catch(()=>[])]:[]));lc=(rs[0]||[]).concat(rs[1]||[])}catch(e){lc=null}
    if(my!==tok||LT!=='Klaim'||!body.isConnected)return hasil;
    const kl=Array.isArray(LR)?LR.slice():[];
    const keys=kl.length?Object.keys(kl[0]):KOL;
-   const lcr=(lc||[]).filter(x=>hari?dk(x)===LP:true).map(x=>ubah(x,keys));
+   const lcr=(lc||[]).filter(x=>hari?lcKey(x)===LP:true).map(x=>ubah(x,keys));
    const all=kl.concat(lcr).sort((a,b)=>nr(a).localeCompare(nr(b),undefined,{numeric:true}));
    if(!all.length){const p=body.querySelector('.lcg');if(p)p.remove();return hasil}
    LR=all;LH=null;   // Excel / PDF memakai semua baris
    const tb=ganti(body,tbl(all,null));
    const trs=tb.querySelectorAll('tbody tr'),n=trs.length;
    trs.forEach((tr,i)=>{if(i<n-MAXV)tr.classList.add('lx')});
-   let s='Klaim '+kl.length+' + LC '+lcr.length+' = '+n+' data, urut No Registrasi.';
+   let s='Klaim '+kl.length+' + LC '+lcr.length+' = '+n+' data, urut No Registrasi.'+(hari?' Tanggal yang dipilih = tanggal kejadian (LC: tanggal pekerjaan).':'');
    if(lc===null)s='Data LC belum bisa dimuat, tabel ini hanya berisi Klaim ('+kl.length+' data). Buka menu Laporan lagi untuk mencoba ulang.';
    if(n>MAXV)s+=' Layar menampilkan '+MAXV+' data terbaru; semua '+n+' data ada di Excel, PDF, dan Cetak.';
    info(body,s);
   }catch(e){try{console.error(e)}catch(_){}}
   return hasil};
 }catch(e){}})();
-// ---- PETUGAS CAT: peran baru "cat". Input Bengkel = nama petugas Cat + foto saja. Input LC = nomor mobil + nama petugas Cat + foto sebelum / selesai perbaikan. ----
-// Data dari petugas Cat tetap muncul di pilihan No Registrasi, supaya bisa dilengkapi petugas Bengkel. Kolom "Nama Petugas Cat" ada di Input Bengkel dan Input LC (sebelum upload foto).
-// Daftar nama petugas Cat diisi admin di menu Pengaturan ("Petugas Cat"). Akun Cat dibuat di Pengaturan > Kelola Pengguna (peran: cat).
+// ---- PETUGAS CAT: peran baru "cat". Input Bengkel = foto selesai perbaikan saja. Input LC = nomor mobil + foto sebelum / selesai perbaikan. ----
+// Nama petugas (NIP - Nama) terisi OTOMATIS dari akun yang login (tidak perlu dipilih / diketik): akun Cat (kolom "Nama Petugas Cat" di Input Bengkel dan Input LC, sebelum upload foto)
+// dan juga akun Security, Bengkel, PU, Operasi (kolom "NIP & Nama Petugas" di form masing-masing). Akun admin tetap memilih sendiri.
+// Data dari petugas Cat tetap muncul di pilihan No Registrasi, supaya bisa dilengkapi petugas Bengkel.
+// Akun Cat dibuat di Pengaturan > Kelola Pengguna (peran: cat; isi Nama dan NIP).
 (function(){try{
  const isCat=()=>!!U&&U.peran=='cat';
+ // Nama Petugas Cat otomatis = "NIP - Nama" akun yang login (sama dengan yang dicatat server)
+ const catLabel=()=>{const n=String((U&&U.nama)||'').trim(),p=String((U&&U.nip)||'').trim();return p&&n.indexOf(p)<0?p+' - '+n:(n||String((U&&U.username)||''))};
+ const AUTO=['security','bengkel','pu','operasi'],autoP=()=>!!U&&AUTO.indexOf(U.peran)>=0;
+ const autoFix=root=>{const k=isCat()?'PetugasCat':autoP()?'Petugas':'';if(!k)return;const e=(root||document).querySelector('[name="'+k+'"]');if(e)e.value=catLabel()};
  try{RF.cat='Bengkel'}catch(e){}
- try{if(!SF.some(x=>x[0]=='petugasCat'))SF.push(['petugasCat','Petugas Cat (NIP - Nama, satu per baris)','area'])}catch(e){}
+ try{if(!SF.some(x=>x[0]=='petugasCat'))SF.push(['petugasCat','Daftar pilihan Petugas Cat untuk akun Bengkel (NIP - Nama, satu per baris, boleh kosong)','area'])}catch(e){}
 
  // ----- Input Bengkel -----
  // Semua akun: kolom "Nama Petugas Cat" sebelum foto. Akun Cat: HANYA Nama Petugas Cat + Foto Selesai Perbaikan.
  const BF=FM.Bengkel.f;
  if(!BF.some(x=>x[0]=='PetugasCat')){const i=BF.findIndex(x=>x[0]=='FotoSelesai');BF.splice(i<0?BF.length:i,0,['PetugasCat','Nama Petugas Cat','sel','petugasCat',0])}
  const fs0=BF.find(x=>x[0]=='FotoSelesai')||['FotoSelesai','Foto Selesai Perbaikan','foto','',1];
- const BCAT=[['PetugasCat','Nama Petugas Cat','sel','petugasCat',1],[fs0[0],fs0[1],fs0[2],fs0[3],1]];
+ const BCAT=[['PetugasCat','Nama Petugas Cat','text','',0],[fs0[0],fs0[1],fs0[2],fs0[3],1]];
  Object.defineProperty(FM.Bengkel,'f',{get:()=>isCat()?BCAT:BF,configurable:true});
 
  // ----- Input LC -----
@@ -1112,13 +1123,18 @@ body[data-p=input] #v{row-gap:20px}
   if(!LFULL){
    if(!LCF.some(x=>x[0]=='PetugasCat')){const i=LCF.findIndex(x=>x[0]=='FotoSebelum');LCF.splice(i<0?LCF.length:i,0,['PetugasCat','Nama Petugas Cat','sel','petugasCat',0])}
    LFULL=LCF.slice();
-   LCAT=['NoMobil','PetugasCat','FotoSebelum','FotoSesudah'].map(k=>{const x=LFULL.find(y=>y[0]==k);return[x[0],x[1],x[2],x[3],(k=='NoMobil'||k=='PetugasCat')?1:0]})}
+   LCAT=['NoMobil','PetugasCat','FotoSebelum','FotoSesudah'].map(k=>{const x=LFULL.find(y=>y[0]==k);return[x[0],x[1],k=='PetugasCat'?'text':x[2],k=='PetugasCat'?'':x[3],k=='NoMobil'?1:0]})}
   LCF.splice(0,LCF.length,...(isCat()?LCAT:LFULL))};
  const lcOk=()=>!!U&&(U.peran=='admin'||U.peran=='bengkel'||U.peran=='cat');
 
- // daftar nama petugas Cat kosong -> kolom nama berupa ketikan biasa
+ // akun lain: daftar nama petugas Cat kosong -> kolom nama berupa ketikan biasa
  try{const f=fld;fld=function(a){
-  if(a&&a[0]=='PetugasCat'&&a[2]=='sel'&&!String(S.petugasCat||'').split('\n').some(x=>x.trim()))a=[a[0],a[1],'text','',a[4]];
+  // akun Security / Bengkel / PU / Operasi: kolom Petugas terisi otomatis dari login
+  if(a&&a[0]=='Petugas'&&autoP())return`<label class="f"><span class="l">${a[1]}</span><input class="in" name="Petugas" readonly value="${esc(catLabel())}"><small>Terisi otomatis sesuai akun yang login.</small></label>`;
+  if(a&&a[0]=='PetugasCat'){
+   // akun Cat: nama + NIP terisi otomatis dari login, tidak bisa diubah
+   if(isCat())return`<label class="f"><span class="l">${a[1]}</span><input class="in" name="PetugasCat" readonly value="${esc(catLabel())}"><small>Terisi otomatis sesuai akun yang login.</small></label>`;
+   if(a[2]=='sel'&&!String(S.petugasCat||'').split('\n').some(x=>x.trim()))a=[a[0],a[1],'text','',a[4]]}
   return f.call(this,a)}}catch(e){}
  // nama yang tersimpan tetap tampil walau sudah tidak ada di daftar Pengaturan
  const SV=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
@@ -1130,13 +1146,15 @@ body[data-p=input] #v{row-gap:20px}
  new MutationObserver(()=>{
   V.querySelectorAll('select[name="PetugasCat"]').forEach(patch);
   const r=document.getElementById('ur');   // pilihan peran di Kelola Pengguna
-  if(r&&r.tagName=='SELECT'&&!r.querySelector('option[value="cat"]'))r.insertAdjacentHTML('beforeend','<option value="cat">cat (Petugas Cat: foto Input Bengkel + Input LC)</option>')
+  if(r&&r.tagName=='SELECT'&&!r.querySelector('option[value="cat"]'))r.insertAdjacentHTML('beforeend','<option value="cat">cat (Petugas Cat: foto Input Bengkel + Input LC)</option>');
+  const un=document.getElementById('un');   // kolom NIP di Kelola Pengguna (NIP + Nama akun otomatis jadi NIP & Nama Petugas di form input)
+  if(un&&!document.getElementById('unip')){const lb=un.closest('label');if(lb)lb.insertAdjacentHTML('afterend','<label class="f"><span class="l">NIP (dipakai otomatis sebagai NIP &amp; Nama Petugas di form input)</span><input class="in" id="unip" type="text" autocomplete="off" placeholder="Contoh: 123456"></label>')}
  }).observe(V,{childList:true,subtree:true});
 
  // Input Bengkel: data awal dari petugas Cat (belum lengkap) langsung bisa diisi, tidak terkunci
  try{const f=pick;pick=async function(){
   const r=await f.apply(this,arguments);
-  try{if(X=='Bengkel'){const fs=$('#fs'),st=fs&&fs.querySelector('[name="Status"]');if(fs&&(!st||!st.value))fs.disabled=false}}catch(e){}
+  try{if(X=='Bengkel'){const fs=$('#fs'),st=fs&&fs.querySelector('[name="Status"]');if(fs&&(!st||!st.value))fs.disabled=false}autoFix($('#fs'))}catch(e){}
   return r}}catch(e){}
 
  // menu Input Data: akun Cat melihat Input Bengkel + Input LC
@@ -1157,7 +1175,7 @@ body[data-p=input] #v{row-gap:20px}
  window.lcPick=async function(v){
   const f=$('#lcForm');if(!f)return;
   const lj=f.querySelector('[name="LanjutReg"]');lj.value=v||'';
-  const kosong=()=>{f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')e.value=''});LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=[];drawPh(x[0])})};
+  const kosong=()=>{f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')e.value=''});LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=[];drawPh(x[0])});autoFix(f)};
   kosong();
   if(!v)return;
   try{
@@ -1166,15 +1184,22 @@ body[data-p=input] #v{row-gap:20px}
    if(lj.value!==v)return;   // pilihan sudah diganti saat menunggu
    f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')setV(e,r[e.name]||'')});
    LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=r[x[0]]?r[x[0]].split('\n').filter(Boolean):[];drawPh(x[0])});
+   autoFix(f)
   }catch(e){toast(e.message||'Gagal memanggil data')}};
- // akun Cat: minimal satu foto (sebelum atau selesai perbaikan)
+ // akun Cat: nomor mobil + minimal satu foto (sebelum atau selesai perbaikan), lalu bisa langsung Simpan
  try{const f=saveLC;saveLC=function(){
   if(isCat()){
    const v=k=>{const e=$('#lcForm [name="'+k+'"]');return e?e.value.trim():''};
    if(!v('NoMobil'))return toast('Nomor Mobil wajib diisi');
-   if(!v('PetugasCat'))return toast('Nama Petugas Cat wajib diisi');
    if(!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return toast('Upload minimal satu foto (sebelum atau selesai perbaikan)')}
   return f.apply(this,arguments)}}catch(e){}
+ // Nama petugas otomatis tetap terisi setelah form memanggil data lama / membuat klaim baru, dan tepat sebelum Simpan
+ try{const f=loadRevision;loadRevision=async function(){const r=await f.apply(this,arguments);try{autoFix($('#fs'))}catch(_){}return r}}catch(e){}
+ try{const f=newClaim;newClaim=async function(){const r=await f.apply(this,arguments);try{autoFix($('#fs'))}catch(_){}return r}}catch(e){}
+ try{const f=save;save=function(){try{autoFix($('#dataForm'))}catch(_){}return f.apply(this,arguments)}}catch(e){}
+ // Kelola Pengguna: kolom NIP ikut dibaca dan disimpan
+ try{const f=fillU;fillU=function(i){f.apply(this,arguments);try{const e=$('#unip'),x=US[i];if(e)e.value=(x&&x.NIP)||''}catch(_){}}}catch(e){}
+ try{saveU=async function(){try{const n=$('#unip');await run('saveUser',{Username:$('#uu').value,Nama:$('#un').value,Password:$('#up').value,Peran:$('#ur').value,NIP:n?n.value.trim():undefined});toast('Pengguna tersimpan');go('dash')}catch(e){toast(e.message)}}}catch(e){}
 }catch(e){try{console.error(e)}catch(_){}}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
