@@ -395,7 +395,7 @@
     sc = 1;
     bgRun(() => rpc('session', a, {ms: 20000, tries: 1})).then(r => {
       kv('set', 'session', r); kv('set', 'sessTk', a[0]);
-      try { if (typeof U != 'undefined' && U && (U.peran != r.peran || U.nama != r.nama)) { U.peran = r.peran; U.nama = r.nama; } } catch (e) {}
+      try { if (typeof U != 'undefined' && U && (U.peran != r.peran || U.nama != r.nama || U.nip != r.nip)) { U.peran = r.peran; U.nama = r.nama; U.nip = r.nip; } } catch (e) {}
     }, e => {
       if (!/SESI_HABIS/.test(e.message)) return;
       try { if (localStorage.getItem('tk') == a[0] && typeof bye == 'function') bye(); } catch (x) {}
@@ -424,7 +424,7 @@
     if (fn == 'login') {
       const r = await rpc(fn, [a[0], a[1], curMonth()], {ms: 25000, tries: 2});
       const b = r.boot; delete r.boot;
-      kv('set', 'session', {username: r.username, nama: r.nama, peran: r.peran});
+      kv('set', 'session', {username: r.username, nama: r.nama, peran: r.peran, nip: r.nip});
       kv('set', 'sessTk', r.token);
       if (b) await seed(b);
       setTimeout(() => flush().then(warm), 3000);
