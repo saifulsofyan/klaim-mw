@@ -264,7 +264,7 @@ vDash=async function(){
   const mm=M,s=await run('lcSummary',mm);
   if(P!='dash'||M!=mm)return;
   const kt=(c,t,n)=>`<div class="dm ${c}" style="flex:1"><b>${t}</b><div><span class="n">${n}</span> <small>Unit</small></div></div>`;
-  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row" style="margin-bottom:10px">${kt('c3','Selesai',s.selesai)+kt('c4','Tunda',s.tunda)}</div>${tbl(s.rows.map(x=>[x.NoReg,x.NoMobil,x.JenisKendaraan,x.Status,x.Biaya]),['No Reg','No Mobil','Jenis','Status','Biaya (Rp)'])}</div>`;
+  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)+kt('c4','Tunda',s.tunda)}</div></div>`;   // daftar rincian LC tidak ditampilkan di dashboard (sudah ada di menu Laporan)
   const f=V.querySelector('.cd.hd');
   if(f)f.insertAdjacentHTML('beforebegin',html);else V.insertAdjacentHTML('beforeend',html)
  }catch(e){}};
@@ -1227,7 +1227,7 @@ body[data-p=input] #v{row-gap:20px}
   +'#pvO .pvq{display:flex;gap:8px;align-items:center}'
   +'#pvO .pvsg{flex:none;display:flex;gap:3px;background:#EEF2FA;border-radius:12px;padding:3px}#pvO .pvsg button{border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:13px;font-weight:700;color:#5B6478;background:transparent}#pvO .pvsg button.on{background:var(--b,#0B5ED7);color:#fff}'
   +'#pvO .pvs{flex:1;min-width:0;height:44px;border:1px solid #C9CEDD;border-radius:12px;padding:0 12px;font:inherit;font-size:15px;background:#fff;color:inherit;margin:0}'
-  +'#pvO .pvn{font-size:12px;color:#5B6478;margin-top:6px}'
+  +'#pvO .pvn{display:flex;align-items:center;gap:8px;font-size:12px;color:#5B6478;margin-top:6px;line-height:1.3}#pvO .pvnt{flex:1;min-width:0}#pvO .pvz{flex:none;display:flex;gap:4px}#pvO .pvz button{border:1px solid #C9CEDD;background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-weight:700;color:var(--t,#14206B);line-height:1.2}'
   +'#pvO .pvl{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:10px 12px}'
   +'#pvO .pvl.t{padding:0 0 10px}'
   +'#pvO .pvg{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:10px;align-items:start}'
@@ -1235,9 +1235,13 @@ body[data-p=input] #v{row-gap:20px}
   +'#pvO .pvk h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:16px}#pvO .pvk h4 .no{flex:none;min-width:26px;height:26px;border-radius:13px;background:var(--b,#0B5ED7);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0 6px}#pvO .pvk h4 .tt{flex:1;min-width:0;word-break:break-word}#pvO .pvk h4 .bd{flex:none;background:#FFF1D6;color:#8A5A00;border-radius:8px;padding:3px 9px;font-size:12px}'
   +'#pvO .pvr{display:flex;gap:10px;padding:6px 0;border-top:1px solid #EEF0F6;font-size:14.5px;line-height:1.4}#pvO .pvr span{flex:none;width:34%;max-width:130px;color:#5B6478;font-size:12.5px;padding-top:1px}#pvO .pvr em{flex:1;min-width:0;font-style:normal;word-break:break-word;white-space:pre-wrap}'
   +'#pvO a{display:inline-block;margin:0 6px 4px 0;padding:5px 12px;border-radius:8px;background:#E2EEFF;color:var(--b,#0B5ED7);font-weight:700;text-decoration:none;white-space:normal}'
-  +'#pvO table{border-collapse:separate;border-spacing:0;font-size:13.5px;background:#fff;width:max-content;min-width:100%}'
-  +'#pvO th{position:sticky;top:0;z-index:2;background:#E2EEFF;padding:10px 8px;white-space:nowrap;text-align:center}'
-  +'#pvO td{padding:9px 8px;text-align:left;border-bottom:1px solid #EEF0F6;white-space:normal;min-width:64px;max-width:240px;word-break:break-word;vertical-align:top;background:#fff}'
+  +'#pvO table{border-collapse:separate;border-spacing:0;font-size:var(--pvf,12px);line-height:1.25;background:#fff;width:max-content;min-width:100%}'
+  +'#pvO table.fx{table-layout:fixed;min-width:0}'
+  +'#pvO th{position:sticky;top:0;z-index:2;background:#E2EEFF;padding:5px 3px;white-space:normal;overflow-wrap:break-word;vertical-align:middle;text-align:center}'
+  +'#pvO td{padding:4px 3px;text-align:left;border-bottom:1px solid #EEF0F6;white-space:nowrap;vertical-align:top;background:#fff}'
+  +'#pvO td.w{white-space:normal;overflow-wrap:break-word}'
+  +'#pvO table.mn td,#pvO table.mn th{white-space:normal}#pvO table.mx td,#pvO table.mx th{white-space:nowrap}#pvO table.mn td:first-child,#pvO table.mn th:first-child{white-space:nowrap}'
+  +'#pvO td a{display:inline;margin:0 6px 0 0;padding:0;background:none;border-radius:0;text-decoration:underline;font-weight:600;white-space:nowrap}'
   +'#pvO tr:nth-child(even) td{background:#F4F8FE}'
   +'#pvO th:first-child,#pvO td:first-child{position:sticky;left:0;z-index:1;white-space:nowrap;font-weight:700}#pvO th:first-child{z-index:3}'
   +'#pvO tr.tot td{font-weight:800;background:#E2EEFF}'
@@ -1259,13 +1263,15 @@ body[data-p=input] #v{row-gap:20px}
  const lab=(h,i)=>{const s=String(h||'').replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').trim();return s||('Kolom '+(i+1))};
  const isTot=r=>String(r[0])=='TOTAL';
  // isi sel -> html (teks biasa + tombol Foto untuk alamat gambar)
+ // HP tegak: tanggal ditulis ringkas (16/10 14:47) supaya muat; HP miring / komputer / Excel / PDF tetap lengkap
+ const tglR=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?$/.exec(String(v==null?'':v).trim());return m?m[3]+'/'+m[2]+(m[4]?' '+m[4]:''):null};
  function val(v){
   const s=String(v==null?'':v).trim();if(!s)return '';
   const ln=s.split('\n').map(x=>x.trim()).filter(Boolean),u=ln.filter(x=>/^https?:/i.test(x)),o=ln.filter(x=>!/^https?:/i.test(x));
   return o.map(esc).join('\n')+(o.length&&u.length?'\n':'')+u.map((x,i)=>'<a href="'+esc(x)+'" target="_blank" rel="noopener">'+(u.length>1?'Foto '+(i+1):'Foto')+'</a>').join('')}
  const plain=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
 
- let O=null,pushed=false,view='',pref={},D=null,qs='',tm=0,prevFocus=null,prevOv='';
+ let O=null,pushed=false,view='',vpref='',fz=0,lw=0,rt=0,D=null,qs='',tm=0,prevFocus=null,prevOv='';
  const kd=e=>{if(e.key=='Escape'){e.preventDefault();tutup()}};
  function tutup(dariBack){
   if(!O)return;
@@ -1283,12 +1289,15 @@ body[data-p=input] #v{row-gap:20px}
   const L=O.querySelector('.pvl'),idx=[];
   D.rows.forEach((r,i)=>{if(cocok(r))idx.push(i)});
   const nTot=D.rows.length;
-  O.querySelector('.pvn').textContent=qs?(idx.length+' dari '+nTot+' data cocok dengan "'+qs+'"'):(nTot+' data');
+  O.querySelector('.pvnt').textContent=qs?(idx.length+' dari '+nTot+' data cocok dengan "'+qs+'"'):(nTot+' data');
   if(!idx.length){L.innerHTML='<p class="pvkos">Tidak ada data yang cocok.</p>';return}
   const jc=D.head.indexOf('Jenis');
   if(view=='tabel'){
-   L.innerHTML='<table><thead><tr>'+D.head.map((h,i)=>'<th>'+esc(lab(h,i))+'</th>').join('')+'</tr></thead><tbody>'
-    +idx.map(i=>{const r=D.rows[i];return'<tr'+(isTot(r)?' class="tot"':'')+'>'+D.head.map((_,c)=>'<td>'+val(r[c])+'</td>').join('')+'</tr>'}).join('')+'</tbody></table>';
+   lw=L.clientWidth;
+   const vc=D.vc=D.cols.filter(c=>!(D.head[c]=='Bulan'&&lw<600));   // kolom Bulan hanya di layar lebar (HP miring / komputer)
+   L.innerHTML='<table><thead><tr>'+vc.map(i=>'<th>'+esc(lab(D.head[i],i))+'</th>').join('')+'</tr></thead><tbody>'
+    +idx.map(i=>{const r=D.rows[i];return'<tr'+(isTot(r)?' class="tot"':'')+'>'+vc.map(c=>'<td'+(c>0?' class="w"':'')+'>'+(lw<600&&tglR(r[c])||val(r[c]))+'</td>').join('')+'</tr>'}).join('')+'</tbody></table>';
+   fit(L);
   }else{
    const sk=D.head.indexOf('Bulan');   // kolom Bulan sama dengan tanggal, tidak perlu di kartu
    L.innerHTML='<div class="pvg">'+idx.map(i=>{
@@ -1297,10 +1306,53 @@ body[data-p=input] #v{row-gap:20px}
      +D.head.map((h,c)=>{if(c==0||c==sk||(c==jc&&bd))return'';const v=val(r[c]);return v?'<div class="pvr"><span>'+esc(lab(h,c))+'</span><em>'+v+'</em></div>':''}).join('')+'</div>'}).join('')+'</div>';
   }
   L.scrollTop=0}
+ // TATA LETAK TABEL: kolom utama (No Reg ... Detail) dibuat muat di lebar layar: teks dibungkus ke baris bawah dan huruf diperkecil otomatis (13 -> 8 px).
+ // Kolom lain (WA, Foto, Petugas, Lokasi, ...) ada di sebelah kanan: geser ke samping, atau miringkan HP supaya lebih lebar. Tombol A- / A+ mengatur huruf sendiri.
+ const ZS=[8,9,10,11,12,13,14,16];
+ const sum=(a,f)=>a.reduce((s,x,i)=>s+(f[i]?x:0),0);
+ function fit(L){
+  const t=L.querySelector('table');if(!t||!t.tHead)return;
+  const ths=[].slice.call(t.tHead.rows[0].cells),pri=D.vc.map(c=>D.pri[c]),W=L.clientWidth-1;
+  const meas=m=>{   // lebar tiap kolom: mn = selebar kata terpanjang (paling rapat), mx = satu baris penuh
+   const g=t.querySelector('colgroup');if(g)g.remove();
+   t.className=m;t.style.tableLayout='auto';t.style.minWidth='0';t.style.width=m=='mn'?'min-content':'max-content';
+   return ths.map(h=>h.getBoundingClientRect().width)};
+  const all=pri.map(()=>true),semua=pri.every(Boolean);
+  let pr=pri,mn,mx,nat=false;
+  const coba=(flags,S)=>{   // cari huruf terbesar dari daftar S yang membuat kolom bertanda muat di layar
+   for(let i=0;i<S.length;i++){
+    L.style.setProperty('--pvf',S[i]+'px');
+    mn=meas('mn');mx=meas('mx');
+    if(sum(mn.map(Math.ceil),flags)<=W)return true}
+   return false};
+  if(fz){
+   L.style.setProperty('--pvf',fz+'px');mn=meas('mn');mx=meas('mx');
+   if(sum(mn.map(Math.ceil),all)<=W)pr=all}
+  else if(!semua&&coba(all,[13,12,11,10,9]))pr=all;   // layar lebar (HP miring / komputer): SEMUA kolom muat
+  else if(!coba(pri,[13,12,11,10,9,8.5,8])&&sum(mn.map(Math.ceil),pri)>W*1.3){L.style.setProperty('--pvf','10px');mn=meas('mn');mx=meas('mx');nat=true}   // terlalu banyak kolom utama: huruf 10 px, lebar alami, geser ke samping (kalau hanya kurang sedikit: tetap 8 px paling rapat)
+  const mnC=mn.map(Math.ceil),sMn=sum(mnC,pr),sMx=sum(mx,pr);
+  let w;
+  if(nat)w=mx.map(x=>Math.ceil(Math.min(x,190)));
+  else{const k=sMx<=W?1:Math.max(0,Math.min(1,(W-sMn)/(sMx-sMn)));w=mnC.map((x,i)=>pr[i]?x+Math.floor(Math.max(0,mx[i]-x)*k):Math.ceil(Math.min(mx[i],190)))}
+  t.className='fx';t.style.minWidth='';t.style.tableLayout='fixed';
+  t.style.width=Math.max(w.reduce((a,b)=>a+b,0),L.clientWidth)+'px';
+  t.insertAdjacentHTML('afterbegin','<colgroup>'+w.map(x=>'<col style="width:'+x+'px">').join('')+'</colgroup>');
+  petunjuk(L)}
+ function petunjuk(L){
+  const t=L.querySelector('table'),n=O.querySelector('.pvnt');if(!t||!n)return;
+  n.textContent=n.textContent.replace(/ · geser.*$/,'');
+  if(t.scrollWidth>L.clientWidth+1)n.textContent+=' · geser ke samping'+(innerHeight>innerWidth?' / putar HP miring':'')+' untuk kolom di kanan'}
+ function zoom(d){
+  const L=O&&O.querySelector('.pvl'),t=L&&L.querySelector('table');if(!t)return;
+  const cur=fz||parseFloat(getComputedStyle(t).fontSize)||12;
+  let k=0;ZS.forEach((z,i)=>{if(Math.abs(z-cur)<Math.abs(ZS[k]-cur))k=i});
+  k=Math.max(0,Math.min(ZS.length-1,k+d));fz=ZS[k];
+  fit(L)}
  function setView(v){
-  view=v;pref[D&&D.head.length<=6?'s':'w']=v;
+  view=v;vpref=v;
   if(!O)return;
   O.querySelector('.pvl').classList.toggle('t',v=='tabel');
+  O.querySelector('.pvz').style.display=v=='tabel'?'':'none';
   O.querySelectorAll('.pvsg button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-v')==v));
   isi()}
  function buka(){
@@ -1310,22 +1362,28 @@ body[data-p=input] #v{row-gap:20px}
   if(g&&/^Menggabungkan/.test(g.textContent))return toast('Data LC sedang digabung, coba lagi sebentar lagi');
   const d=data();
   if(!d||!d.rows.length)return toast('Belum ada data untuk dipreview');
-  D=d;qs='';
+  D=d;qs='';fz=0;
+  D.cols=d.head.map((h,i)=>i).filter(i=>i==0||d.rows.some(r=>plain(r[i])!==''));   // tabel preview: tanpa kolom yang kosong semua
+  const PRI=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail'];   // kolom utama: harus terlihat semua di HP tegak
+  const adaPri=d.head.filter(h=>PRI.indexOf(h)>=0).length>=4;
+  D.pri=d.head.map((h,i)=>i==0||!adaPri||PRI.indexOf(h)>=0);
+  D.wrap=d.head.map((h,i)=>/^(Detail|Lokasi|LawanTabrak)$/.test(h)||d.rows.some(r=>plain(r[i]).length>28));
   const lcN=(typeof LT!='undefined'&&LT=='Klaim')?(()=>{const j=d.head.indexOf('Jenis');return j>0?d.rows.filter(r=>plain(r[j])=='LC').length:0})():0;
   const n=d.rows.filter(r=>!isTot(r)).length;
   const sub=[d.sub,n+' data'+(lcN?' (Klaim '+(n-lcN)+' · LC '+lcN+')':'')].filter(Boolean).join(' · ');
-  view=pref[d.head.length<=6?'s':'w']||((d.head.length<=6||innerWidth>=900)?'tabel':'kartu');   // pilihan Kartu/Tabel diingat per jenis laporan (ringkas / lebar)
+  view=vpref||'tabel';   // tampilan awal = Tabel rapat (banyak baris sekaligus); pilihan Kartu/Tabel diingat
   prevFocus=document.activeElement;
   O=document.createElement('div');O.id='pvO';O.setAttribute('role','dialog');O.setAttribute('aria-modal','true');O.setAttribute('aria-label','Preview '+d.title);
   O.innerHTML='<div class="pvh"><div class="pvhd"><b>'+esc(d.title)+'</b><small>'+esc(sub)+'</small></div><button type="button" class="pvx" data-a="x" aria-label="Tutup preview">✕</button></div>'
    +'<div class="pvt"><div class="pvch">'+(d.top||[]).map(([l,v])=>'<div><b>'+esc(v)+'</b><span>'+esc(l)+'</span></div>').join('')+'</div>'
-   +'<div class="pvq"><div class="pvsg"><button type="button" data-v="kartu">Kartu</button><button type="button" data-v="tabel">Tabel</button></div><input class="pvs" type="search" placeholder="Cari no reg / nama / mobil" autocomplete="off" enterkeyhint="search"></div><div class="pvn"></div></div>'
+   +'<div class="pvq"><div class="pvsg"><button type="button" data-v="kartu">Kartu</button><button type="button" data-v="tabel">Tabel</button></div><input class="pvs" type="search" placeholder="Cari no reg / nama / mobil" autocomplete="off" enterkeyhint="search"></div><div class="pvn"><span class="pvnt"></span><span class="pvz"><button type="button" data-z="-1" aria-label="Huruf lebih kecil">A−</button><button type="button" data-z="1" aria-label="Huruf lebih besar">A+</button></span></div></div>'
    +'<div class="pvl"></div>'
    +'<div class="pvf"><button type="button" class="btn" style="background:#0F7A3D;color:#fff" data-a="xlsx">Excel</button><button type="button" class="btn" style="background:#D92027;color:#fff" data-a="pdf">PDF</button><button type="button" class="btn s" data-a="x">Tutup</button></div>';
   O.addEventListener('click',e=>{
    const b=e.target&&e.target.closest?e.target.closest('button'):null;if(!b)return;
    const a=b.getAttribute('data-a'),v=b.getAttribute('data-v');
    if(v)return setView(v);
+   if(b.getAttribute('data-z'))return zoom(+b.getAttribute('data-z'));
    if(a=='x')return tutup();
    if(a=='xlsx'||a=='pdf'){try{if(window.unduhLaporan)window.unduhLaporan.unduh(a);else if(a=='xlsx')csv();else window.print()}catch(er){toast('Gagal membuat file')}}});
   O.querySelector('.pvs').addEventListener('input',e=>{const t=e.target.value;clearTimeout(tm);tm=setTimeout(()=>{qs=t.trim().toLowerCase();isi()},150)});
@@ -1335,6 +1393,8 @@ body[data-p=input] #v{row-gap:20px}
   try{history.pushState({pv:1},'');pushed=true}catch(e){pushed=false}
   setView(view);
   try{O.querySelector('.pvx').focus({preventScroll:true})}catch(e){}}
+ // HP dimiringkan / ukuran layar berubah -> tata letak tabel dihitung ulang
+ window.addEventListener('resize',()=>{if(!O)return;clearTimeout(rt);rt=setTimeout(()=>{const L=O&&O.querySelector('.pvl');if(!L||L.clientWidth===lw)return;isi()},150)});
  window.previewLaporan={buka,tutup};
 
  // ---- tombol "Preview" di kartu laporan (di atas tombol Excel / PDF / Cetak) ----
