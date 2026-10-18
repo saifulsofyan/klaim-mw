@@ -1486,6 +1486,24 @@ body[data-p=input] #v{row-gap:20px}
    if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC Input LC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{});
   return r}}catch(e){}
 }catch(e){try{console.error(e)}catch(_){}}})();
+// ---- NOMOR REGISTRASI KLAIM MENGIKUTI TGL KEJADIAN: pratinjau nomor di form ikut berubah saat Tgl Kejadian dipilih ----
+(function(){try{
+ let tok=0;
+ document.addEventListener('change',async function(ev){
+  try{
+   const e=ev.target;
+   if(!e||e.name!=='TglKejadian'||X!=='Klaim'||P!=='form')return;
+   const n=$('#NoReg');if(!n||n.dataset.s)return;   // revisi: nomor lama tidak berubah
+   const my=++tok;
+   const r=await run('nextReg',e.value||'');
+   if(my!==tok||$('#NoReg')!==n||n.dataset.s||typeof r!=='string'||!r)return;
+   n.value=r;
+   const lb=n.closest('label');let sm=lb&&lb.querySelector('small.rk');
+   if(lb&&!sm){sm=document.createElement('small');sm.className='rk';lb.appendChild(sm)}
+   if(sm)sm.textContent=e.value&&/^D\d{8}$/.test(r)?'Nomor mengikuti bulan Tanggal Kejadian.':''
+  }catch(_){}
+ })
+}catch(e){try{console.error(e)}catch(_){}}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
