@@ -1415,6 +1415,77 @@ body[data-p=input] #v{row-gap:20px}
  new MutationObserver(()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;try{pasang()}catch(e){}})}).observe(root,{childList:true,subtree:true});
  pasang();
 }catch(e){try{console.error(e)}catch(_){}}})();
+// ---- ACC ADMIN: nomor mobil yang sama 2x dalam 1 bulan di Input LC (petugas Cat) ----
+(function(){try{
+ const isCat=()=>!!U&&U.peran=='cat',isAdm=()=>!!U&&U.peran=='admin';
+ {const s=document.createElement('style');s.textContent=`
+.accO{position:fixed;left:0;right:0;top:0;bottom:0;z-index:100000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.accB{background:#fff;border-radius:16px;max-width:420px;width:100%;padding:18px 18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.accB h3{margin:0 0 8px;font-size:17px;color:#B45309}.accB p{margin:0 0 14px;font-size:14px;line-height:1.55;color:var(--t)}
+.accBn{display:flex;align-items:center;gap:10px;margin-top:12px;padding:12px 14px;border-radius:12px;background:#FFF1D6;color:#92400E;font-size:13.5px;font-weight:700;cursor:pointer;border:1px solid #F5D08A}
+.accBn b{margin-left:auto;white-space:nowrap;color:#B45309}
+.accR{padding:10px 0;border-bottom:1px solid var(--ln)}.accR:last-child{border-bottom:0}
+.accR small{display:block;color:var(--m);line-height:1.5;margin-top:3px}
+.accS{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;vertical-align:middle}
+.accS.Menunggu{background:#FFF1D6;color:#B45309}.accS.ACC{background:#DFF6E6;color:#15803D}.accS.Ditolak{background:#FDE4E4;color:#B91C1C}.accS.Terpakai{background:#E9ECF2;color:#5B6478}
+.accR .row{margin-top:8px;gap:8px}.accR .btn{min-height:40px;font-size:13px}`;document.head.appendChild(s)}
+ // ---------- petugas Cat: dialog yang tetap tampil sampai ditutup (toast 3 detik terlalu singkat) ----------
+ window.accDlg=function(msg){
+  const old=document.getElementById('accDlg');if(old)old.remove();
+  const d=document.createElement('div');d.className='accO';d.id='accDlg';
+  d.innerHTML='<div class="accB" role="alertdialog" aria-modal="true"><h3>Perlu ACC Admin</h3><p>'+esc(msg)+'</p><button type="button" class="btn p" style="width:100%">Mengerti</button></div>';
+  d.querySelector('button').onclick=()=>d.remove();
+  document.body.appendChild(d)};
+ // periksa nomor mobil SEBELUM foto diunggah; galat jaringan -> lanjut simpan biasa (server tetap memeriksa lagi)
+ try{const f=saveLC;saveLC=async function(){
+  if(!isCat())return f.apply(this,arguments);
+  const form=$('#lcForm');if(!form)return f.apply(this,arguments);
+  const g=k=>{const e=form.querySelector('[name="'+k+'"]');return e?e.value.trim():''};
+  const no=g('NoMobil');
+  if(!no||!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return f.apply(this,arguments);  // data belum lengkap: pesan bawaan form yang tampil
+  if(window.ACCC||window.SV)return;
+  window.ACCC=true;toast('Memeriksa nomor mobil…');
+  try{await run('lcCek',no,g('LanjutReg'))}
+  catch(e){const m=String((e&&e.message)||'');if(/ACC/.test(m)){accDlg(m);return}}
+  finally{window.ACCC=false}
+  return f.apply(this,arguments)}}catch(e){}
+ // ---------- admin: daftar permintaan ACC ----------
+ let AL=[];
+ const row=(x,i)=>{
+  const b=(k,t,c)=>`<button type="button" class="btn ${c}" onclick="accKep(${i},'${k}')">${t}</button>`;
+  let a='';
+  if(x.Status=='Menunggu')a=`<div class="row">${b('ACC','ACC','p')}${b('Ditolak','Tolak','s')}</div>`;
+  else if(x.Status=='ACC')a=`<div class="row">${b('Ditolak','Batalkan ACC','s')}</div>`;
+  else if(x.Status=='Ditolak')a=`<div class="row">${b('ACC','ACC','p')}</div>`;
+  const info=x.Status=='Terpakai'?`Dipakai untuk input <b>${esc(x.NoRegBaru)}</b>`:(x.Keputusan?`Diputuskan ${esc(x.Keputusan)} · ${esc(x.TglKeputusan)}`:'');
+  return `<div class="accR"><b>${esc(x.NoMobil)}</b><span class="accS ${esc(x.Status)}">${esc(x.Status)}</span><small>Diminta ${esc(x.Peminta)} · ${esc(x.Tanggal)}<br>Sudah ada di Input LC: ${esc(x.NoRegAda)} (bulan ${esc(x.Bulan)})${info?'<br>'+info:''}</small>${a}</div>`};
+ const card=()=>{
+  const n=AL.filter(x=>x.Status=='Menunggu').length;
+  return `<div class="hd"><div class="ico c3">${ic('car',22,'var(--fg)')}</div><div style="flex:1"><h3>ACC Input LC</h3><small>Nomor mobil sama 2x dalam 1 bulan${n?' · <b style="color:#B45309">'+n+' menunggu</b>':''}</small></div></div>`+
+   (AL.length?AL.map(row).join(''):'<p style="color:var(--m);font-size:13.5px;margin:4px 0 2px">Belum ada permintaan ACC.</p>')};
+ const paint=()=>{const c=document.getElementById('accCd');if(c)c.innerHTML=card()};
+ window.accKep=async function(i,k){
+  const x=AL[i];if(!x||window.ACCK)return;window.ACCK=true;
+  try{await run('accPutus',x.ID,k);toast(k=='ACC'?'ACC diberikan untuk '+x.NoMobil+'. Petugas Cat bisa input satu kali.':'Permintaan '+x.NoMobil+' ditolak');AL=await run('accList');paint()}
+  catch(e){toast(e.message||'Gagal menyimpan keputusan')}
+  finally{window.ACCK=false}};
+ try{const f=vSet;vSet=async function(){
+  await f.apply(this,arguments);
+  if(!isAdm()||P!='set')return;
+  const first=V.querySelector('.cd');if(!first)return;
+  first.insertAdjacentHTML('afterend','<div class="cd" id="accCd"><p style="color:var(--m);font-size:13.5px;margin:4px 0">Memuat permintaan ACC…</p></div>');
+  try{AL=await run('accList');paint()}
+  catch(e){const c=document.getElementById('accCd');if(c)c.innerHTML='<p style="color:#B91C1C;font-size:13.5px;margin:4px 0">Daftar ACC belum bisa dimuat: '+esc(e.message||'')+'</p>'}}}catch(e){}
+ // ---------- admin: pemberitahuan di Dashboard bila ada yang menunggu ----------
+ try{const f=vDash;vDash=async function(){
+  const r=await f.apply(this,arguments);
+  if(isAdm())run('accList').then(l=>{
+   if(P!='dash'||!isAdm())return;
+   const o=document.getElementById('accBn');if(o)o.remove();
+   const n=(l||[]).filter(x=>x.Status=='Menunggu').length;
+   if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC Input LC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{});
+  return r}}catch(e){}
+}catch(e){try{console.error(e)}catch(_){}}})();
 // ================= akhir TTD PENGEMUDI =================
 // ---- login ----
 function showLogin(){
