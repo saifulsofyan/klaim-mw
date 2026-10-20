@@ -71,7 +71,7 @@
   // Server Google kadang lambat (sampai puluhan detik). Baca data: tunggu maksimal 20 detik, bila gagal coba sekali lagi.
   // Simpan data (save/foto) TIDAK diberi batas waktu atau diulang, supaya tidak tersimpan dua kali.
   const RD = {ms: 20000, tries: 2}, BGO = {ms: 25000, tries: 1};
-  const READS = ['getSettings', 'nextReg', 'regs', 'regsPlus', 'getRecord', 'report', 'dashboard', 'frekuensi', 'poinAktif', 'listUsers', 'lcSummary', 'ttdSummary'];
+  const READS = ['getSettings', 'nextReg', 'regs', 'regsPlus', 'getRecord', 'report', 'dashboard', 'frekuensi', 'poinAktif', 'estBengkel', 'listUsers', 'lcSummary', 'ttdSummary'];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const curMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
   // Server Google melambat bila banyak permintaan sekaligus (diukur: 3 permintaan bersamaan selesai berurutan 4 > 17 > 27 detik).
@@ -143,6 +143,7 @@
       if (r.list.length) {
         if (r.rec !== undefined) pairs.push(['getRecord:' + JSON.stringify([f, r.list[0].v]), r.rec]);
         if (r.poin !== undefined) pairs.push(['poinAktif:' + JSON.stringify([r.list[0].v]), r.poin]);
+        if (r.est !== undefined) pairs.push(['estBengkel:' + JSON.stringify([r.list[0].v]), r.est]);
       }
       cacheSetMany(pairs).catch(() => {});
       return r;
@@ -192,6 +193,7 @@
       const v0 = r.list[0].v;
       if (r.rec !== undefined) seed('getRecord', [form, v0], r.rec);
       if (r.poin !== undefined) seed('poinAktif', [v0], r.poin);
+      if (r.est !== undefined) seed('estBengkel', [v0], r.est);
     }
     cacheSetMany(pairs);
     return r.list;
