@@ -78,9 +78,9 @@
   // Pekerjaan di belakang layar dijalankan SATU per satu, dan baru mulai saat petugas tidak sedang menunggu server.
   // Antrean pekerjaan belakang layar: satu per satu. urgent = didahulukan (cek perubahan data, angka Dashboard yang baru berubah), tetap tidak bersamaan.
   const BQ = [];
-  let bqBusy = false;
+  let bqBusy = false, BGHOLD = 0;  // BGHOLD: ada perubahan data baru terdeteksi -> pekerjaan persiapan biasa menunggu, angka terbaru didahulukan
   const bgRun = (fn, anyTime, urgent) => new Promise((ok, no) => {
-    const j = {fn: fn, any: anyTime, ok: ok, no: no};
+    const j = {fn: fn, any: anyTime, ok: ok, no: no, urg: !!urgent};
     if (urgent) BQ.unshift(j); else BQ.push(j);
     bgPump();
   });
@@ -90,6 +90,7 @@
     try {
       while (BQ.length) {
         const j = BQ[0];
+        if (!j.urg && Date.now() < BGHOLD) { await sleep(80); continue; }
         if (!j.any && FG > 0) { await sleep(300); continue; }  // petugas sedang menunggu server: tunggu (pekerjaan urgent yang datang belakangan tetap didahulukan)
         BQ.shift();
         try { j.ok(await j.fn()); } catch (e) { j.no(e); }
@@ -505,11 +506,17 @@
       do {
         chAgain = false;
         await stale(true);  // salinan Dashboard dianggap basi, data form lama dibuang
-        await refreshCur(true, true);  // angka terbaru dulu (layar diperbarui sendiri bila berubah)
+        try {  // Laporan / Frekuensi yang sedang terbuka: isi diganti data terbaru lebih dulu (layar lama tetap tampil sampai data baru siap)
+          if (typeof P != 'undefined' && !document.getElementById('pvO')) {
+            if (P == 'frek' && typeof vFrek == 'function') await vFrek();
+            else if (P == 'lap' && typeof showLap == 'function' && document.getElementById('lr')) await showLap();
+          }
+        } catch (e) {}
+        await refreshCur(true, true);  // angka Dashboard terbaru (layar diperbarui sendiri bila berubah)
         try { if (window.accBnRefresh) window.accBnRefresh(); } catch (e) {}  // admin: pemberitahuan permintaan ACC di Dashboard
         if (typeof P != 'undefined' && (P == 'dash' || P == 'input')) prefetchSoon();
       } while (chAgain);
-    } finally { chBusy = false; }
+    } finally { chBusy = false; BGHOLD = 0; }
   }
   const T0 = Date.now();
   async function coldCheck() {  // aplikasi baru dibuka: angka Dashboard di HP masih salinan dari pemakaian sebelumnya? ambil sekarang (yang baru dibawa login / sudah diambil sejak dibuka tidak diulang)
@@ -518,13 +525,13 @@
     if (!t || t < T0) refreshCur(true, true);
   }
   async function verCheck() {
-    if (verBusy || !navigator.onLine || isOff() || document.hidden) return;
+    if (verBusy || chBusy || !navigator.onLine || isOff() || !shown()) return;
     let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
     if (!tk) return;
     verBusy = true;
     let ch = false, cold = false;
     try {
-      const v = String(await bgRun(() => rpc('api', [tk, 'ver', []], {ms: 12000, tries: 1}), false, true));  // panggilan kecil, didahulukan supaya perubahan cepat terlihat
+      const v = String(await bgRun(async () => { const r = await rpc('api', [tk, 'ver', []], {ms: 12000, tries: 1}); if (VER !== null && String(r) !== VER) BGHOLD = Date.now() + 6000; return r; }, false, true));  // panggilan kecil, didahulukan supaya perubahan cepat terlihat
       VERON = true; VERAT = Date.now();
       const was = VER; VER = v;
       ch = was !== null && was !== v;
@@ -536,31 +543,49 @@
     } finally { verBusy = false; }
     if (ch) await changed(); else if (cold) await coldCheck();
   }
+  // HP (WebView Android) sering tidak mengirim event saat layar menyala lagi, atau salah melaporkan status "tersembunyi", atau memperlambat pewaktu
+  // saat layar mati. Karena itu "bangun" dikenali dari beberapa tanda sekaligus: event layar, sentuhan pertama, jeda animasi, dan jeda pewaktu.
+  let rafAt = Date.now(), touchAt = 0, wakeAt = 0;
+  const alive = () => Date.now() - rafAt < 4000 || Date.now() - touchAt < 6000;  // layar benar-benar tampil (animasi berjalan / baru disentuh)
+  function shown() { return !document.hidden || alive(); }
   async function wake() {  // aplikasi baru kembali ke layar / HP baru bangun
-    if (document.hidden || !navigator.onLine || isOff()) return;
-    const away = hiddenAt ? Date.now() - hiddenAt : 0;
-    hiddenAt = 0; lastTick = Date.now();
+    if (!shown() || !navigator.onLine || isOff()) return;
+    const now = Date.now(), away = Math.max(hiddenAt ? now - hiddenAt : 0, now - lastTick);
+    hiddenAt = 0; lastTick = now; wakeAt = now;
+    if (away > 20000 && typeof P != 'undefined' && P == 'dash') refreshCur(true, true);  // sudah lama ditinggal: angka Dashboard langsung diambil, tanpa menunggu pemeriksaan penanda dulu
     await verCheck();
-    if (away > 120000 && typeof P != 'undefined' && P == 'dash') refreshCur(true, true);  // lama ditinggal: pastikan angka terbaru
   }
   function syncTick() {
     const now = Date.now(), gap = now - lastTick;
     lastTick = now;
-    if (document.hidden || typeof P == 'undefined' || !navigator.onLine || isOff()) return;
-    if (gap > 30000) { wake(); return; }  // pewaktu sempat berhenti (HP tidur / aplikasi di belakang)
-    if (P != 'dash' && P != 'input') return;
+    if (!shown() || typeof P == 'undefined' || !navigator.onLine || isOff()) return;
+    if (gap > 15000) { wake(); return; }  // pewaktu sempat berhenti / melambat (HP tidur / aplikasi di belakang)
+    if (['dash', 'input', 'lap', 'frek'].indexOf(P) < 0) return;
     if (VERON) verCheck();
     if (now - lastSafe >= (VERON ? SAFE_MS : SAFE_OLD)) {
       lastSafe = now;
       if (P == 'dash') refreshCur(false);
-      else if (!VERON) prefetchSoon();
+      else if (!VERON && (P == 'input' || P == 'dash')) prefetchSoon();
     }
   }
   setInterval(syncTick, VER_MS);
   document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else wake(); });
-  window.addEventListener('focus', () => { if (hiddenAt || Date.now() - lastTick > 30000) wake(); });
-  window.addEventListener('pageshow', e => { if (e.persisted) wake(); });
+  window.addEventListener('focus', () => wake());
+  window.addEventListener('pageshow', () => wake());
+  document.addEventListener('resume', () => wake());  // Page Lifecycle: halaman dibekukan lalu dihidupkan lagi
   window.addEventListener('online', () => setTimeout(wake, 1500));
+  // sentuhan pertama setelah HP dibiarkan: kalau pemeriksaan terakhir sudah > 8 detik, periksa sekarang
+  const touched = () => { const n = Date.now(); touchAt = n; if (n - VERAT > 8000 && n - wakeAt > 3000) wake(); };
+  ['touchstart', 'pointerdown', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, touched, {capture: true, passive: true}));
+  // detak animasi tiap ~1 detik: animasi berhenti selama layar mati; begitu layar menyala lagi jedanya terlihat -> bangun
+  (function beat() {
+    requestAnimationFrame(() => {
+      const n = Date.now(), gap = n - rafAt;
+      rafAt = n;
+      if (gap > 6000) wake();
+      setTimeout(beat, 1000);
+    });
+  })();
   setTimeout(verCheck, 1500);  // penanda awal dicatat tak lama setelah aplikasi dibuka; diulang sampai Dashboard sempat diperiksa
   [4000, 8000].forEach(ms => setTimeout(() => { if (!coldDone) verCheck(); }, ms));
 
@@ -572,7 +597,7 @@
   document.addEventListener('DOMContentLoaded', () => { hookPh(); hookGo(); badge(); flush().then(warm); });
   setInterval(flush, 30000);
   // selama petugas berada di Dashboard / menu Input, data form disegarkan tiap ~90 detik supaya selalu siap
-  setInterval(() => { try { if (!document.hidden && typeof P != 'undefined' && (P == 'dash' || P == 'input')) prefetchAll(); } catch (e) {} }, 60000);
+  setInterval(() => { try { if (shown() && typeof P != 'undefined' && (P == 'dash' || P == 'input')) prefetchAll(); } catch (e) {} }, 60000);
   // Layar login terbuka: bangunkan server Google sekarang, sementara petugas mengetik username & password
   try { if (!localStorage.getItem('tk') && navigator.onLine && !isOff()) fetch(APP_URL, {method: 'POST', body: JSON.stringify({fn: 'ping', args: []})}).catch(() => {}); } catch (e) {}
 })();
