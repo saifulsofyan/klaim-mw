@@ -8,6 +8,7 @@
   const FALLBACK = {getRecord: null, poinAktif: 0, regs: [], nextReg: 'Otomatis saat online'};
   const MEM = {};
   let DBP, busy = false, bd, uid = 0, FG = 0;  // FG = jumlah pekerjaan petugas yang sedang berjalan
+  let VER = null, VERAT = 0, VERON = true, SYNC = 0;  // penanda perubahan data di server (lihat bagian 'sinkron otomatis')
 
   // ---------- penyimpanan lokal (IndexedDB, cadangan: memori) ----------
   const db = () => DBP || (DBP = new Promise(ok => {
@@ -42,14 +43,15 @@
   // Salinan dianggap basi setelah 10 menit atau setelah ada input baru, lalu diambil ulang dari server.
   const SUMMARY = ['dashboard', 'lcSummary', 'frekuensi', 'report', 'ttdSummary'], TTL = 600000;
   const cacheFresh = async k => { const c = (await kv('get', 'cache')) || {}; return c[k] !== undefined && Date.now() - (c['@t:' + k] || 0) < TTL ? c[k] : undefined; };
-  async function stale() {
+  async function stale(noRefresh) {
     const c = (await kv('get', 'cache')) || {};
     Object.keys(c).forEach(k => { if (k.indexOf('@t:') == 0 && SUMMARY.indexOf(k.slice(3).split(':')[0]) >= 0) delete c[k]; });
     HOT = {};
     Object.keys(PRE).forEach(k => delete PRE[k]);
     await kv('set', 'cache', c);
-    if (!isOff()) setTimeout(refreshDash, 300);  // ambil angka dashboard terbaru di belakang layar, supaya saat kembali ke dashboard sudah siap
+    if (!noRefresh && !isOff()) setTimeout(() => refreshCur(true), 300);  // ambil angka dashboard terbaru di belakang layar, supaya saat kembali ke dashboard sudah siap
   }
+  const ownChange = async () => { await stale(); VER = null; };  // perubahan dari HP ini sendiri: jangan dihitung lagi sebagai perubahan orang lain
 
   // ---------- saklar Online / Offline (dipilih petugas di header) ----------
   const isOff = () => { try { return localStorage.getItem('mode') == 'off'; } catch (e) { return false; } };
@@ -74,12 +76,26 @@
   const curMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
   // Server Google melambat bila banyak permintaan sekaligus (diukur: 3 permintaan bersamaan selesai berurutan 4 > 17 > 27 detik).
   // Pekerjaan di belakang layar dijalankan SATU per satu, dan baru mulai saat petugas tidak sedang menunggu server.
-  let bgChain = Promise.resolve();
-  const bgRun = (fn, anyTime) => {
-    const p = bgChain.then(async () => { if (!anyTime) while (FG > 0) await sleep(300); return fn(); });
-    bgChain = p.then(() => {}, () => {});
-    return p;
-  };
+  // Antrean pekerjaan belakang layar: satu per satu. urgent = didahulukan (cek perubahan data, angka Dashboard yang baru berubah), tetap tidak bersamaan.
+  const BQ = [];
+  let bqBusy = false;
+  const bgRun = (fn, anyTime, urgent) => new Promise((ok, no) => {
+    const j = {fn: fn, any: anyTime, ok: ok, no: no};
+    if (urgent) BQ.unshift(j); else BQ.push(j);
+    bgPump();
+  });
+  async function bgPump() {
+    if (bqBusy) return;
+    bqBusy = true;
+    try {
+      while (BQ.length) {
+        const j = BQ[0];
+        if (!j.any && FG > 0) { await sleep(300); continue; }  // petugas sedang menunggu server: tunggu (pekerjaan urgent yang datang belakangan tetap didahulukan)
+        BQ.shift();
+        try { j.ok(await j.fn()); } catch (e) { j.no(e); }
+      }
+    } finally { bqBusy = false; }
+  }
   async function once(fn, args, ms) {
     const ac = ms && window.AbortController ? new AbortController() : null;
     const to = ac ? setTimeout(() => ac.abort(), ms) : 0;
@@ -108,13 +124,15 @@
   // jadi saat form diketuk langsung terbuka tanpa menunggu server Google.
   const PRE = {}, PRE_MS = 120000, FORMS = {security: ['Klaim'], bengkel: ['Bengkel'], pu: ['PU'], operasi: ['Operasi'], cat: ['Bengkel']};
   let preBusy = 0, preAt = 0;
-  const takePre = f => { const e = PRE[f]; if (!e) return null; delete PRE[f]; if (Date.now() - e.t >= PRE_MS) return null; e.run(); return e.p; };
+  const verLive = () => VERON && Date.now() - VERAT < 25000;  // pemantau perubahan aktif (cek terakhir < 25 dtk)
+  const preMs = () => verLive() ? PRE_MS : 45000;  // tanpa pemantau, data form lebih cepat dianggap lama
+  const takePre = f => { const e = PRE[f]; if (!e) return null; delete PRE[f]; if (Date.now() - e.t >= preMs()) return null; e.run(); return e.p; };
   const myForms = () => { try { const u = typeof U != 'undefined' ? U : null; return !u ? [] : u.peran == 'admin' ? ['Klaim', 'Bengkel', 'PU', 'Operasi'] : (FORMS[u.peran] || []); } catch (e) { return []; } };
   function prefetch(f) {
     let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
     if (!tk || !navigator.onLine || isOff()) return null;
     const old = PRE[f];
-    if (old && Date.now() - old.t < PRE_MS - 30000) return old.p;  // masih segar
+    if (old && Date.now() - old.t < preMs() - (verLive() ? 30000 : 25000)) return old.p;  // masih segar
     let started = false, run;
     const job = new Promise((ok, no) => { run = () => { if (started) return; started = true; rpc('api', [tk, 'regsPlus', [f, f]], BGO).then(ok, no); }; });
     bgRun(() => { run(); return job.catch(() => {}); }, true);  // masuk antrean belakang layar (bila petugas mengetuk form lebih dulu, langsung dijalankan)
@@ -148,7 +166,7 @@
     try {
       const f = window.go;
       if (typeof f != 'function' || f.__pf) return;
-      const g = function (p) { try { if (p == 'dash' || p == 'input') setTimeout(prefetchAll, 600); } catch (e) {} return f.apply(this, arguments); };
+      const g = function (p) { try { if (p == 'dash' || p == 'input') { setTimeout(prefetchAll, 600); setTimeout(() => { if (Date.now() - VERAT > 1000) verCheck(); }, 400); } } catch (e) {} return f.apply(this, arguments); };
       g.__pf = 1; window.go = g;
     } catch (e) {}
   }
@@ -187,14 +205,35 @@
       if (typeof fn == 'function') Promise.resolve(fn()).catch(() => {}); else if (typeof render == 'function') render();
     } catch (e) {}
   }
-  async function bgRefresh(args, key, old) {
+  async function bgRefresh(args, key, old, show, urgent) {
     if (BG[key]) return;
     BG[key] = 1;
+    show = !!show && typeof P != 'undefined' && P == 'dash';
+    if (show) { SYNC++; badge(); }  // penanda kecil "Memperbarui data…" selama angka terbaru diambil
     try {
-      const r = await bgRun(() => rpc('api', args, BGO));
+      const r = await bgRun(() => rpc('api', args, BGO), false, urgent);  // urgent = angka yang baru berubah: didahulukan dari pekerjaan persiapan
       await cacheSet(key, r);
       if (JSON.stringify(r) !== JSON.stringify(old)) repaint(args[1]);
-    } catch (e) {} finally { delete BG[key]; }
+    } catch (e) {} finally { delete BG[key]; if (show) { SYNC--; badge(); } }
+  }
+  // Ambil ulang angka bulan yang sedang tampil saja (dashboard, LC, TTD); layar diperbarui sendiri bila angkanya berubah
+  async function refreshCur(show, urgent) {
+    if (!navigator.onLine || isOff()) return;
+    let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
+    if (!tk) return;
+    const m = typeof M != 'undefined' && M ? M : curMonth();
+    const c = (await kv('get', 'cache')) || {}, jobs = [];
+    const first = k => (k.indexOf('dashboard:') == 0 ? 0 : 1);
+    Object.keys(c).sort((x, y) => first(x) - first(y)).forEach(k => {  // Dashboard dulu, supaya angka yang paling dilihat berubah lebih dulu
+      if (k.indexOf('@t:') == 0) return;
+      const f = k.split(':')[0];
+      if (SWR.indexOf(f) < 0) return;
+      let a; try { a = JSON.parse(k.slice(f.length + 1)); } catch (e) { return; }
+      if (!a || a[0] !== m) return;
+      jobs.push([[tk, f, a], k, c[k]]);
+    });
+    if (urgent) { for (const j of jobs) await bgRefresh(j[0], j[1], j[2], show, true); }  // satu per satu
+    else await Promise.all(jobs.map(j => bgRefresh(j[0], j[1], j[2], show)));
   }
   async function refreshDash() {
     if (!navigator.onLine) return;
@@ -229,7 +268,7 @@
       const c = (await kv('get', 'cache')) || {}, t = c['@t:' + key];
       if (c[key] !== undefined) {
         if (isOff() && t && Date.now() - t < TTL) return c[key];  // mode Offline: salinan < 10 menit dipakai apa adanya
-        if (!t || Date.now() - t >= 15000) bgRefresh(args, key, c[key]);
+        if (!t || Date.now() - t >= 15000) bgRefresh(args, key, c[key], !t || Date.now() - t >= 20000);
         return c[key];
       }
     }
@@ -288,7 +327,7 @@
     if (!q0.length) {
       try {  // langsung ke Google Sheet (juga saat mode Offline)
         const r = args[1] == 'uploadFoto' ? await uploadAll(args) : await rpc('api', args);
-        if (args[1] == 'save') await stale();  // dashboard & laporan diambil ulang agar angkanya berubah
+        if (args[1] == 'save') await ownChange();  // dashboard & laporan diambil ulang agar angkanya berubah
         return r;
       } catch (e) { if (!(e instanceof NetErr)) throw e; }
     }
@@ -349,7 +388,7 @@
       }
     } finally { busy = false; }
     if (synced) {
-      await stale();
+      await ownChange();
       if (typeof render == 'function' && typeof P != 'undefined' && P == 'dash') render();
     }
   }
@@ -379,6 +418,7 @@
       bd.onclick = () => flush();
       document.body.appendChild(bd);
     }
+    if (SYNC) t.push('Memperbarui data…');
     if (!navigator.onLine) t.push('Mode offline');
     if (q.length) t.push(q.length + ' data menunggu dikirim (ketuk untuk kirim)');
     if (f.length) t.push(f.length + ' gagal dikirim');
@@ -441,6 +481,86 @@
     return (...a) => { call(p, a).then(r => ok && ok(r), e => no && no(e)); };
   }});
   window.google = {script: {run: mk(null, null)}};
+
+  // ---------- sinkron otomatis antar petugas ----------
+  // Server punya "penanda perubahan" yang berganti setiap ada data baru (Klaim / Bengkel / PU / Operasi / LC / TTD / ACC).
+  // Selama aplikasi tampil di Dashboard atau menu Input, penanda itu ditanyakan tiap 10 detik (satu panggilan kecil).
+  // Begitu berganti: angka Dashboard dan daftar No Registrasi untuk form langsung diambil ulang, layar diperbarui sendiri.
+  // Aplikasi dibuka lagi / kembali ke layar setelah lama: langsung diperiksa tanpa menunggu pewaktu berikutnya.
+  // Cadangan: tiap 60 detik angka Dashboard diambil ulang walau penanda tidak berubah (mis. Sheet diubah langsung).
+  const VER_MS = 10000, SAFE_MS = 60000, SAFE_OLD = 20000;
+  let verBusy = false, lastTick = Date.now(), lastSafe = Date.now(), hiddenAt = 0, coldDone = false;
+  async function prefetchSoon() {
+    for (let i = 0; i < 20 && preBusy; i++) await sleep(500);
+    preAt = 0;
+    prefetchAll();
+  }
+  let chBusy = false, chAgain = false;
+  async function changed() {
+    if (chBusy) { chAgain = true; return; }  // sedang mengambil ulang: setelah selesai ulangi sekali lagi supaya perubahan terbaru tidak terlewat
+    chBusy = true;
+    try {
+      do {
+        chAgain = false;
+        await stale(true);  // salinan Dashboard dianggap basi, data form lama dibuang
+        await refreshCur(true, true);  // angka terbaru dulu (layar diperbarui sendiri bila berubah)
+        try { if (window.accBnRefresh) window.accBnRefresh(); } catch (e) {}  // admin: pemberitahuan permintaan ACC di Dashboard
+        if (typeof P != 'undefined' && (P == 'dash' || P == 'input')) prefetchSoon();
+      } while (chAgain);
+    } finally { chBusy = false; }
+  }
+  const T0 = Date.now();
+  async function coldCheck() {  // aplikasi baru dibuka: angka Dashboard di HP masih salinan dari pemakaian sebelumnya? ambil sekarang (yang baru dibawa login / sudah diambil sejak dibuka tidak diulang)
+    const m = typeof M != 'undefined' && M ? M : curMonth();
+    const t = ((await kv('get', 'cache')) || {})['@t:dashboard:' + JSON.stringify([m])];
+    if (!t || t < T0) refreshCur(true, true);
+  }
+  async function verCheck() {
+    if (verBusy || !navigator.onLine || isOff() || document.hidden) return;
+    let tk = ''; try { tk = localStorage.getItem('tk') || ''; } catch (e) {}
+    if (!tk) return;
+    verBusy = true;
+    let ch = false, cold = false;
+    try {
+      const v = String(await bgRun(() => rpc('api', [tk, 'ver', []], {ms: 12000, tries: 1}), false, true));  // panggilan kecil, didahulukan supaya perubahan cepat terlihat
+      VERON = true; VERAT = Date.now();
+      const was = VER; VER = v;
+      ch = was !== null && was !== v;
+      cold = !ch && !coldDone && typeof P != 'undefined' && P == 'dash';
+      if (cold) coldDone = true;
+    } catch (e) {
+      if (/SESI_HABIS/.test(e.message || '')) { try { if (typeof bye == 'function') bye(); } catch (x) {} }
+      else if (!(e instanceof NetErr) && !(e instanceof BadResp)) VERON = false;  // Code.gs lama (belum ada 'ver'): cukup penyegaran berkala
+    } finally { verBusy = false; }
+    if (ch) await changed(); else if (cold) await coldCheck();
+  }
+  async function wake() {  // aplikasi baru kembali ke layar / HP baru bangun
+    if (document.hidden || !navigator.onLine || isOff()) return;
+    const away = hiddenAt ? Date.now() - hiddenAt : 0;
+    hiddenAt = 0; lastTick = Date.now();
+    await verCheck();
+    if (away > 120000 && typeof P != 'undefined' && P == 'dash') refreshCur(true, true);  // lama ditinggal: pastikan angka terbaru
+  }
+  function syncTick() {
+    const now = Date.now(), gap = now - lastTick;
+    lastTick = now;
+    if (document.hidden || typeof P == 'undefined' || !navigator.onLine || isOff()) return;
+    if (gap > 30000) { wake(); return; }  // pewaktu sempat berhenti (HP tidur / aplikasi di belakang)
+    if (P != 'dash' && P != 'input') return;
+    if (VERON) verCheck();
+    if (now - lastSafe >= (VERON ? SAFE_MS : SAFE_OLD)) {
+      lastSafe = now;
+      if (P == 'dash') refreshCur(false);
+      else if (!VERON) prefetchSoon();
+    }
+  }
+  setInterval(syncTick, VER_MS);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else wake(); });
+  window.addEventListener('focus', () => { if (hiddenAt || Date.now() - lastTick > 30000) wake(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) wake(); });
+  window.addEventListener('online', () => setTimeout(wake, 1500));
+  setTimeout(verCheck, 1500);  // penanda awal dicatat tak lama setelah aplikasi dibuka; diulang sampai Dashboard sempat diperiksa
+  [4000, 8000].forEach(ms => setTimeout(() => { if (!coldDone) verCheck(); }, ms));
 
   // ---------- PWA ----------
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
