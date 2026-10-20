@@ -77,7 +77,7 @@ const OPT={status:['Dalam Proses','Selesai'],tamu:['Ada Tamu','Tidak Ada Tamu'],
 const FM={
 Klaim:{t:'Input Klaim',s:'Security - Klaim Kendaraan',i:'shield',c:'#6D28D9',f:[['TglKejadian','Tanggal Kejadian','date','',1],['JenisMobil','Jenis Mobil','sel','mobil',1],['NIP','NIP Pengemudi','text','',1],['Nama','Nama Pengemudi','text','',1],['NoMobil','No Mobil','text','',1],['Jenis','Jenis Kerusakan','sel','jenis',1],['Detail','Detail Kerusakan','area','',1],['WA','Pergantian WA','text'],['Foto','Foto Kerusakan','foto','',1],['Petugas','NIP & Nama Petugas','sel','petugas',1],['Lokasi','Lokasi Kejadian','text','',1],['LawanTabrak','Lawan Tabrak','text']]},
 Bengkel:{t:'Input Bengkel',s:'Bengkel - Klaim Kendaraan',i:'wrench',c:'#1D4ED8',f:[['Status','Status Pengerjaan','sel','status',1],['Biaya','Estimasi Biaya (Rp)','num','',1],['TglSelesai','Tanggal Selesai Perbaikan','date','',1],['FotoSelesai','Foto Selesai Perbaikan','foto','',1],['Rincian','Capture Rincian Klaim (Data DPF)','foto','',1],['EstPerbaikan','Estimasi Perbaikan','sel','est',1],['Petugas','NIP & Nama Petugas','sel','petugasBengkel',1]]},
-PU:{t:'Input PU',s:'PU - Klaim Kendaraan',i:'clip',c:'#15803D',f:[['Kategori','Kategori','sel','kat',1],['Point','Point','sel','point',1],['pa','Total Point Aktif','calc'],['Dedaan','Dedaan (Rp.)','num','',1],['Petugas','NIP & Nama Petugas','sel','petugasPU',1]]},
+PU:{t:'Input PU',s:'PU - Klaim Kendaraan',i:'clip',c:'#15803D',f:[['Kategori','Kategori','sel','kat',1],['Point','Point','sel','point',1],['pa','Total Point Aktif','calc'],['est','Estimasi Biaya Bengkel','est'],['Dedaan','Dedaan (Rp.)','num','',1],['Petugas','NIP & Nama Petugas','sel','petugasPU',1]]},
 Operasi:{t:'Input Operasi',s:'Operasi - Klaim Kendaraan',i:'clip',c:'#B45309',f:[['Situasi','Situasi Kejadian','area','',1],['Waktu','Waktu Kejadian (jam)','time','',1],['Tamu','Tamu','sel','tamu',1],['JenisMobil','Jenis Mobil','sel','mobil',1],['Planning','Planning','sel','plan',1],['HariKerja','Hari Kerja','num','',1],['Tindakan','Tindakan kepada Pengemudi','sel','tindakan',1],['Petugas','NIP Petugas Operasi','sel','petugasOps',1]]}};
 const SF=[['pool','Nama Pool','text'],['kepala','Kepala Bengkel','text'],['petugas','Petugas Security (NIP - Nama, satu per baris)','area'],['petugasOps','Petugas Operasi (NIP - Nama, satu per baris)','area'],['petugasBengkel','Petugas Bengkel (NIP - Nama, satu per baris)','area'],['petugasPU','Petugas PU (NIP - Nama, satu per baris)','area']];
 const NM={Klaim:'Klaim',Bengkel:'Bengkel',PU:'PU',Operasi:'Operasi',Frek:'Frekuensi Pengemudi'};
@@ -88,24 +88,27 @@ const ic=(n,s=24,c='currentColor')=>`<svg width="${s}" height="${s}" viewBox="0 
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let TK='',U=null;
 const raw=(f,...a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(no)[f](...a));
-const run=(f,...a)=>raw('api',TK,f,a).catch(e=>{if(/SESI_HABIS/.test(e.message)){bye();throw new Error('Sesi berakhir, silakan login lagi')}throw e});
+
+const ORD={Klaim:['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail','WA','Foto','Petugas','Lokasi','LawanTabrak'],Bengkel:['NoReg','Tanggal','Bulan','Status','Biaya','TglSelesai','FotoSelesai','Rincian','EstPerbaikan','Petugas','PetugasCat'],PU:['NoReg','Tanggal','Bulan','Kategori','Point','Dedaan','Petugas'],Operasi:['NoReg','Tanggal','Bulan','Situasi','Waktu','Tamu','JenisMobil','Planning','HariKerja','Tindakan','Petugas'],TTD:['NoReg','Tanggal','Bulan','NIP','Nama','JumlahKlaim','JumlahPoint','Biaya','TTD','Petugas'],LC:['NoReg','Tanggal','Bulan','NoMobil','JenisKendaraan','Detail','TglPekerjaan','Status','Biaya','EstLama','FotoSebelum','FotoSesudah','NoMO','PetugasCat']};
+const ordRows=(t,r)=>{const o=ORD[t];if(!o||!Array.isArray(r))return r;return r.map(x=>{if(!x||typeof x!='object'||Array.isArray(x))return x;const n={};o.forEach(k=>{if(k in x)n[k]=x[k]});Object.keys(x).forEach(k=>{if(!(k in n))n[k]=x[k]});return n})};
+const run=(f,...a)=>raw('api',TK,f,a).then(r=>f==='report'?ordRows(a[0],r):r).catch(e=>{if(/SESI_HABIS/.test(e.message)){bye();throw new Error('Sesi berakhir, silakan login lagi')}throw e});
 const RF={security:'Klaim',bengkel:'Bengkel',pu:'PU',operasi:'Operasi'},can=t=>!!U&&(U.peran=='admin'||RF[U.peran]==t),fgo=t=>can(t)?go('form',t):toast('Akun Anda tidak punya akses Input '+t);
 const opt=(l,s)=>l.map(x=>{const[v,t]=String(x).split('|');return`<option value="${esc(v)}"${v==s?' selected':''}>${esc(t||v)}</option>`}).join('');
 const yrs=()=>{const y=new Date().getFullYear();return[y-3,y-2,y-1,y,y+1]};
 const now=()=>{const d=new Date();return d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear()+' '+d.toTimeString().slice(0,5)};
 const toast=m=>{const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3000)};
 const d0=new Date();
-let S={pool:'Pool Margasatwa',kepala:'-'},M=d0.getFullYear()+'-'+String(d0.getMonth()+1).padStart(2,'0'),P='dash',X='',PH={},LT='Klaim',LR=[],LH=null,LP='',LM='';
+let S={pool:'Pool Margasatwa',kepala:'-'},M=d0.getFullYear()+'-'+String(d0.getMonth()+1).padStart(2,'0'),P='dash',X='',PH={},PUT=0,PUOK=false,PUTM=0,LT='Klaim',LR=[],LH=null,LP='',LM='';
 const fm=m=>BLN[+m.slice(5)-1]+' '+m.slice(0,4),bl=()=>BLN[+M.slice(5)-1];
 
-// ---- bulan (bisa diedit) ----
+
 const msel=()=>`<div class="mp np">${ic('cal',20,'#0B5ED7')}<select id="mm" aria-label="Bulan" onchange="setM()">${opt(BLN.map((b,i)=>(i+1)+'|'+b),+M.slice(5))}</select><select id="my" aria-label="Tahun" onchange="setM()">${opt(yrs(),M.slice(0,4))}</select></div>`;
 function setM(){M=$('#my').value+'-'+String($('#mm').value).padStart(2,'0');render()}
 
-// ---- saklar Online / Offline (hanya di aplikasi HP/PWA) ----
+
 const modeSw=()=>window.MODE?`<button class="md ${MODE.off()?'off':''}" onclick="togMode()" aria-label="Mode online atau offline"><span>${MODE.off()?'Offline':'Online'}</span><i></i></button>`:'<div class="chip">Kepala Bengkel<b>'+esc(S.kepala)+'</b></div>';
 function togMode(){MODE.set(!MODE.off());head();toast(MODE.off()?'Mode OFFLINE: ringkasan dari HP, input langsung ke Google Sheet':'Mode ONLINE: semua data langsung dari server');if(!MODE.off()&&P=='dash')render()}
-// ---- header, menu bawah, router ----
+
 function head(x){$('header').innerHTML=x
  ?`<button class="ib" onclick="go('${x.back||'dash'}')" aria-label="Kembali">${ic('back',28)}</button><div class="lg">${ic(x.i,28,x.c)}</div><div class="tt"><b style="font-size:20px">${x.t}</b><span>${x.s}</span></div>`
  :`<button class="ib" onclick="go('dash')" aria-label="Menu">${ic('menu')}</button><div class="lg">${ic('car',28,'#0B5ED7')}</div><div class="tt"><b>Monitoring KLAIM MW</b><span>${esc(S.pool)}</span></div>${modeSw()}<div class="av">${esc(((U&&U.nama)||'?')[0].toUpperCase())}</div>`}
@@ -113,7 +116,7 @@ function nv(){const on={dash:0,frek:0,lap:1,input:2,form:2,set:3}[P];$('nav').in
 function go(p,x){P=p;X=x;window.scrollTo(0,0);nv();render()}
 async function render(){V.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';try{await({dash:vDash,input:vInput,form:vForm,lap:vLap,frek:vFrek,set:vSet}[P])()}catch(e){toast(e.message||'Terjadi kesalahan')}}
 
-// ---- dashboard ----
+
 async function vDash(){
  head();const d=await run('dashboard',M);
  const tl=(c,i,t,n,s,to)=>`<button class="tl ${c}" onclick="fgo('${to}')">${ic(i,28,'var(--fg)')}<b>${t}</b><span class="n">${n}<small style="font-size:10px;font-weight:700;margin-left:3px;color:var(--fg)">${to=='Klaim'?100:(d.klaim?Math.min(100,Math.round(n/d.klaim*100)):0)}%</small></span><span class="u">Unit</span><i class="ch">${s}</i></button>`;
@@ -122,16 +125,17 @@ async function vDash(){
 <div class="cd"><div class="hd"><div class="ico c5">${ic('wrench',22,'var(--fg)')}</div><h3>Jenis Kerusakan</h3><div class="tot">Total<b>${d.klaim} Unit</b></div></div><div class="g3">${OPT.jenis.map((j,i)=>`<div class="dm c${[5,2,6,3,1,7][i]}"><b>${j}</b><div><span class="n">${d.jenis[j]}</span> <small>Unit</small></div></div>`).join('')}</div></div>
 <div class="cd hd" style="margin-bottom:0"><div class="ico c2">${ic('users',22,'var(--fg)')}</div><div style="flex:1"><b>Frekuensi Pengemudi</b><br><small>Lihat detail frekuensi pengemudi</small></div><button class="btn" style="flex:none;padding:0 12px;background:#0F7A3D;color:#fff;font-size:12px" onclick="go('frek')">Tampilkan Data ›</button></div>`}
 
-// ---- menu Input Data ----
+
 async function vInput(){
  head();const mc=(c,i,t,s,to)=>`<button class="mc ${c}" onclick="fgo('${to}')"><div class="ico" style="width:64px;height:64px;background:rgba(255,255,255,.65)">${ic(i,36,'var(--fg)')}</div><div><b>${t}</b><span>Input data klaim kendaraan (${s})</span></div>${ic('chevr',22,'var(--fg)')}</button>`;
  V.innerHTML=msel()+`<div class="bn"><div><h2>INPUT DATA</h2><p>Pilih jenis input data yang ingin diisi untuk bulan ${fm(M)}.</p></div>${ic('clip',56,'#fff')}</div>`+[['c1','shield','Input Klaim','Security','Klaim'],['c2','wrench','Input Bengkel','Bengkel','Bengkel'],['c3','clip','Input PU','PU','PU'],['c4','gear','Input Ops','Operasi','Operasi']].filter(x=>can(x[4])).map(x=>mc(...x)).join('')||'<div class="cd">Akun Anda tidak memiliki akses input data. Hubungi admin.</div>'}
 
-// ---- form input (Klaim, Bengkel, PU, Operasi) ----
+
 function fld([k,l,t,o,r]){
  const p=l.toLowerCase(),q=r?'<b class="rq"> *</b>':'',h=`<label class="f"><span class="l">${l}${q}</span>`;
  if(t=='calc')return`<div class="f"><span class="l">${l}</span><div class="pa"><span>Total point pengemudi<br><small>dalam 6 bulan terakhir</small></span><span><b id="pv">0.0</b> Point</span></div><div class="info">Total point dihitung otomatis berdasarkan jumlah klaim yang sudah tercatat untuk NIP pengemudi ini dalam 6 bulan terakhir.</div></div>`;
- if(t=='foto')return`<div class="f"><span class="l">${l}${q}</span><label class="up">${ic('upload',24,'#0B5ED7')}Klik untuk upload foto (JPG, PNG)<input type="file" accept="image/*" multiple hidden onchange="addPh('${k}',this)"></label><div class="ph" id="ph_${k}"></div></div>`;
+ if(t=='est')return`<div class="f"><span class="l">${l}</span><input class="in" id="estIn" readonly value="Memuat…"><small id="estInfo">Mengambil estimasi dari Input Bengkel…</small></div>`;
+ if(t=='foto')return`<div class="f"><span class="l">${l}${q}</span><label class="up">${ic('upload',24,'#0B5ED7')}Klik untuk upload foto (JPG, PNG)<input type="file" accept="image/\x2a" multiple hidden onchange="addPh('${k}',this)"></label><div class="ph" id="ph_${k}"></div></div>`;
  if(t=='area')return h+`<textarea class="in" name="${k}" maxlength="500" placeholder="Jelaskan ${p}"></textarea></label>`;
  if(t=='sel')return h+`<select class="in" name="${k}"><option value="">Pilih ${p}</option>${opt(OPT[o]||(S[o]||'').split('\n').filter(Boolean))}</select></label>`;
  return h+`<input class="in" name="${k}" type="${t=='num'?'number':t}"${t=='num'?' inputmode="numeric" min="0"':''} placeholder="Masukkan ${p}"></label>`}
@@ -150,13 +154,39 @@ async function vForm(){
  <p style="font-size:12px;color:var(--m);line-height:1.5;margin:0 0 10px">Masukkan nomor registrasi sebelumnya untuk memanggil data klaim yang sudah diinput. Data akan muncul pada form di atas dan dapat diedit.</p>
  <label class="f"><span class="l">Nomor Registrasi Sebelumnya</span><input class="in" id="revReg" list="revRegList" placeholder="Contoh: D261004" autocomplete="off"><datalist id="revRegList">${rg.map(r=>`<option value="${esc(r.v)}">${esc(r.l)}</option>`).join('')}</datalist><small>Masukkan nomor registrasi lengkap, lalu klik Panggil Data.</small></label>
  <div class="row"><button type="button" class="btn p" onclick="loadRevision()">${ic('search',20,'#fff')}Panggil Data</button><button type="button" class="btn s" onclick="newClaim()">${ic('plus',20)}Input Klaim Baru</button></div><p id="revHint" style="font-size:12px;color:var(--m);margin-bottom:0"></p></div>`:''}`;
+ if(X=='PU')puEst(undefined,null);
  if(X!='Klaim')pick(reg)}
+
+function puEst(es,r){
+ const inp=$('#estIn'),inf=$('#estInfo'),bt=document.querySelector('#dataForm .btn.p');if(!inp)return;
+ const ld=es===undefined,ok=!ld&&es!==null&&es!=='';
+ PUOK=ok||(!!r&&!ld);
+ const n=ok?parseFloat(es):NaN;
+ inp.value=ld?'Memuat…':ok?(isNaN(n)?String(es):'Rp '+n.toLocaleString('id-ID')):es===null?'Belum bisa dimuat':'Belum diisi Bengkel';
+ inp.style.cssText=ok||ld?'':'color:#B45309;font-weight:700;background:#FFF7E6;border-color:#F5D08A';
+ inf.style.cssText=ok||ld?'':'color:#B45309;font-weight:700';
+ inf.textContent=ld?'Mengambil estimasi dari Input Bengkel…':ok?'Diambil otomatis dari Input Bengkel.':es===null?'Estimasi dari Bengkel belum bisa dimuat. Periksa koneksi internet, lalu pilih ulang No Registrasi. Jika tetap begini, pastikan Code.gs di Apps Script sudah versi terbaru.':'Bengkel belum mengisi Estimasi Biaya untuk No Registrasi ini. Input PU belum bisa disimpan, tunggu input dari Bengkel (layar ini diperbarui otomatis).';
+ if(bt)bt.disabled=!PUOK;
+ const o=$('#NoReg')&&$('#NoReg').selectedOptions&&$('#NoReg').selectedOptions[0];if(o&&ok)o.textContent=o.textContent.replace(/ - menunggu Bengkel$/,'');
+ if(PUOK){if(PUTM){clearInterval(PUTM);PUTM=0}}else if(!ld&&!PUTM)PUTM=setInterval(puTick,8000)}
+async function puTick(){
+ if(P!='form'||X!='PU'||PUOK){clearInterval(PUTM);PUTM=0;return}
+ if(document.hidden)return;
+ const s=$('#NoReg'),v=s&&s.value;if(!v)return;
+ let es;try{es=await run('estBengkel',v)}catch(e){return}
+ const s2=$('#NoReg');if(PUOK||P!='form'||X!='PU'||!s2||s2.value!==v)return;
+ if(es!==''&&es!=null)puEst(es,null)}
 async function pick(v){
+ const tk=X=='PU'?++PUT:0;if(X=='PU')puEst(undefined,null);
  const r=await run('getRecord',X,v),fs=$('#fs');
+ if(X=='PU'&&tk!==PUT)return;
  fs.querySelectorAll('[name]').forEach(e=>e.value=r?r[e.name]||'':'');
  FM[X].f.filter(f=>f[2]=='foto').forEach(f=>{PH[f[0]]=r&&r[f[0]]?r[f[0]].split('\n').filter(Boolean):[];drawPh(f[0])});
  fs.disabled=!!r;
- if(X=='PU')$('#pv').textContent=(await run('poinAktif',v)).toFixed(1)}
+ if(X=='PU'){const[pt,es]=await Promise.all([run('poinAktif',v).catch(()=>null),run('estBengkel',v).catch(()=>null)]);
+  if(tk!==PUT)return;
+  if(pt==null)toast('Total point belum bisa dimuat');else $('#pv').textContent=pt.toFixed(1);
+  puEst(es,r)}}
 async function loadRevision(){
  const reg=($('#revReg').value||'').trim();
  if(!reg)return toast('Masukkan nomor registrasi sebelumnya');
@@ -186,6 +216,7 @@ async function newClaim(){
 function addPh(k,el){PH[k]=PH[k]||[];[...el.files].forEach(f=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,1000/Math.max(im.width,im.height));c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);PH[k].push({data:c.toDataURL('image/jpeg',.7),name:f.name.replace(/\.\w+$/,'')+'.jpg'});drawPh(k)};im.src=r.result};r.readAsDataURL(f)});el.value=''}
 function drawPh(k){$('#ph_'+k).innerHTML=PH[k].map((p,i)=>`<div><img src="${p.data||esc(p)}" alt="Foto"><button type="button" aria-label="Hapus" onclick="PH['${k}'].splice(${i},1);drawPh('${k}')">×</button></div>`).join('')}
 async function save(){
+ if(X=='PU'&&!PUOK)return toast('Estimasi Biaya Bengkel belum diisi. Tunggu input dari Bengkel dulu.');
  const d={};$('#dataForm').querySelectorAll('[name]').forEach(e=>d[e.name]=e.value.trim());
  if(X=='Klaim'&&!$('#NoReg').dataset.s)d.NoReg='';
  for(const[k,l,t,,r]of FM[X].f)if(r&&(t=='foto'?!(PH[k]||[]).length:!d[k]))return toast(l+' wajib diisi');
@@ -200,18 +231,18 @@ async function save(){
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
 
-// ---- tabel ----
+
 const cell=v=>String(v).split('\n').map(x=>/^https?:/.test(x)?`<a href="${esc(x)}" target="_blank">Foto</a>`:esc(x)).join(' ');
 const tbl=(r,h)=>r.length?`<div class="tb"><table><thead><tr>${(h||Object.keys(r[0])).map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${r.map(x=>`<tr>${Object.values(x).map(v=>`<td>${cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p style="text-align:center;color:#5B6478">Belum ada data.</p>';
 const FH=()=>['NIP','Nama','Jumlah Point','Jumlah Klaim '+bl(),'Total Point','Jumlah Klaim 6 Bulan'];
 
-// ---- frekuensi pengemudi ----
+
 async function vFrek(){
  head({t:'Frekuensi Pengemudi',s:'Riwayat Klaim '+bl()+' Pengemudi',i:'users',c:'#0B5ED7'});
  const r=await run('frekuensi',M);
  V.innerHTML=msel()+`<div class="info">NIP dan nama dirangkum dari seluruh input klaim.<br>Jumlah point berasal dari Input PU.<br>Klaim ${bl()} dihitung dari Input Klaim.<br>Rekap 6 bulan mencakup seluruh klaim dan point PU dalam 6 bulan terakhir.</div><div class="cd"><div class="hd"><div class="ico c2">${ic('users',22,'var(--fg)')}</div><h3>Riwayat Klaim ${bl()} Pengemudi</h3></div>${tbl(r,FH())}</div>`}
 
-// ---- laporan ----
+
 async function vLap(){
  head({t:'Laporan',s:'Monitoring KLAIM MW',i:'file',c:'#0B5ED7'});
  const[y,m]=(LM||M).split('-'),T=[['Klaim','c1','file'],['Bengkel','c2','wrench'],['PU','c3','clip'],['Operasi','c4','gear'],['Frek','c7','users']];
@@ -228,7 +259,7 @@ function csv(){
  const t='\ufeff'+[h].concat(LR.map(r=>Object.values(r))).map(r=>r.map(q).join(',')).join('\r\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='laporan-'+LT+'-'+LP+'.csv';a.click()}
 
-// ---- pengaturan ----
+
 async function vSet(){
  head({t:'Pengaturan',s:'Monitoring KLAIM MW',i:'gear',c:'#0B5ED7'});
  const in_=(id,l,t='text',v='',x='')=>`<label class="f"><span class="l">${l}</span><input class="in" id="${id}" type="${t}" value="${esc(v)}" ${x}></label>`;
@@ -246,7 +277,7 @@ async function chgPw(){try{await run('ubahPassword',$('#po').value,$('#pn').valu
 async function saveSet(){
  const o={};SF.forEach(([k])=>o[k]=$('#s_'+k).value.trim());
  try{await run('saveSettings',o);S=await run('getSettings');toast('Pengaturan tersimpan');render()}catch(e){toast(e.message||'Gagal menyimpan')}}
-// ===== Modul Input LC (hanya akun Bengkel dan admin) =====
+
 OPT.kend=['Avanza','Mobilio','All New Avanza'];OPT.stlc=['Selesai','Tunda'];
 const LCF=[['NoMobil','Nomor Mobil','text','',1],['JenisKendaraan','Jenis Kendaraan','sel','kend',1],['Detail','Detail Kerusakan LC','area','',1],['TglPekerjaan','Tanggal Pekerjaan LC','date','',1],['Status','Status Pengerjaan','sel','stlc',1],['Biaya','Estimasi Biaya Perbaikan (Rp)','num','',1],['EstLama','Estimasi Lama Perbaikan','sel','est',1],['FotoSebelum','Foto Sebelum Perbaikan','foto','',1],['FotoSesudah','Foto Selesai Perbaikan','foto','',1]];
 const canLC=()=>!!U&&(U.peran=='admin'||U.peran=='bengkel');
@@ -264,7 +295,7 @@ vDash=async function(){
   const mm=M,s=await run('lcSummary',mm);
   if(P!='dash'||M!=mm)return;
   const kt=(c,t,n)=>`<div class="dm ${c}" style="flex:1"><b>${t}</b><div><span class="n">${n}</span> <small>Unit</small></div></div>`;
-  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)+kt('c4','Tunda',s.tunda)}</div></div>`;   // daftar rincian LC tidak ditampilkan di dashboard (sudah ada di menu Laporan)
+  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)+kt('c4','Tunda',s.tunda)}</div></div>`;
   const f=V.querySelector('.cd.hd');
   if(f)f.insertAdjacentHTML('beforebegin',html);else V.insertAdjacentHTML('beforeend',html)
  }catch(e){}};
@@ -285,7 +316,7 @@ async function saveLC(){
   setTimeout(()=>go('dash'),800)
  }catch(e){toast(e.message||'Gagal menyimpan')}
  finally{window.SV=false}}
-// ================= TTD PENGEMUDI (barcode -> HP pengemudi -> tanda tangan digital) =================
+
 (function(){const s=document.createElement('style');s.textContent=`
 .dg{gap:4px}.dg .tl{padding:8px 1px 6px}.dg .tl .n{font-size:28px}.dg .tl b{font-size:10px}.dg .tl .u{font-size:10px}.dg .ch{font-size:10px;width:94%}
 .tk{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--ln);font-size:13.5px}.tk:last-of-type{border-bottom:0}.tk span{color:var(--m)}.tk b{text-align:right;word-break:break-word}
@@ -299,12 +330,12 @@ IC.sign='<path d="M4 17l1-4L15 3l3 3L8 16z"/><path d="M13 5l3 3"/><path d="M4 21
 
 const TTD_Q=(()=>{try{const q=new URLSearchParams(location.search).get('ttd')||'';return/^[a-f0-9]{32}$/.test(q)?q:''}catch(e){return''}})();
 const ttdOk=()=>!!U&&(U.peran=='admin'||U.peran=='operasi');
-const ttdBase=()=>window.TTD_BASE||(window.MODE?location.href.split(/[?#]/)[0]:'https://saifulsofyan.github.io/klaim-mw/');
+const ttdBase=()=>window.TTD_BASE||(window.MODE?location.href.split(/[?#]/)[0]:'https:/\x2fsaifulsofyan.github.io/klaim-mw/');
 const ttdUrl=t=>ttdBase()+'?ttd='+t;
 const ttdRp=v=>{const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return String(v).trim()===''||isNaN(n)?'-':'Rp '+n.toLocaleString('id-ID')};
 const ttdRows=d=>[['No Registrasi',d.NoReg],['NIP',d.NIP],['Nama',d.Nama],['Jumlah Point',d.JumlahPoint],['Jumlah Klaim',d.JumlahKlaim],['Biaya Perbaikan',ttdRp(d.Biaya)]].map(([l,v])=>`<div class="tk"><span>${l}</span><b>${esc(v===''||v==null?'-':v)}</b></div>`).join('')+'<p class="tkn">Jumlah point dan klaim dihitung 6 bulan terakhir.</p>';
 
-// ---- pembuat QR (byte mode, koreksi M, versi 1-10; tanpa pustaka luar) ----
+
 function qrSvg(text){
  const u=[...unescape(encodeURIComponent(text))].map(c=>c.charCodeAt(0)),EC=[10,16,26,18,24,16,18,22,22,26],NB=[1,1,1,2,2,4,4,4,5,5];
  const rawM=v=>{let r=(16*v+128)*v+64;if(v>1){const n=Math.floor(v/7)+2;r-=(25*n-10)*n-55;if(v>6)r-=36}return r};
@@ -379,9 +410,9 @@ function qrSvg(text){
  for(let y=0;y<sz;y++)for(let x=0;x<sz;x++)if(fn[y][x])bg[y][x]=m[y][x];
  const q=4,tot=sz+q*2;let d='';
  bg.forEach((row,y)=>{for(let x=0;x<sz;){if(row[x]){let e=x;while(e<sz&&row[e])e++;d+=`M${x+q} ${y+q}h${e-x}v1h-${e-x}z`;x=e}else x++}});
- return`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${tot} ${tot}" shape-rendering="crispEdges" style="width:100%;height:auto;display:block"><rect width="${tot}" height="${tot}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
+ return`<svg xmlns="http:/\x2fwww.w3.org/2000/svg" viewBox="0 0 ${tot} ${tot}" shape-rendering="crispEdges" style="width:100%;height:auto;display:block"><rect width="${tot}" height="${tot}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
 
-// ---- sisi Operasi: pilih No Registrasi -> data otomatis + barcode ----
+
 let TTDT=null,TTDK='';
 async function vTtd(){
  head({t:'TTD Pengemudi',s:'Operasi - Tanda Tangan Pengemudi',i:'sign',c:'#0B5ED7',back:'dash'});
@@ -397,7 +428,7 @@ async function ttdPick(v){
  try{
   const r=await run('ttdLink',v);
   if(!$('#ttdReg')||$('#ttdReg').value!==v)return;
-  if(r.kurang&&r.kurang.length){  // data belum lengkap: tampilkan peringatan, barcode tidak dibuat
+  if(r.kurang&&r.kurang.length){
    $('#ttdBody').innerHTML=ttdRows(r.data)+`<div class="qs er" style="text-align:left;line-height:1.6"><b>Data belum dilengkapi dari PU</b><br>${r.kurang.map(x=>'• '+esc(x)).join('<br>')}<br>Barcode belum bisa ditampilkan.</div><div class="row"><button type="button" class="btn s" onclick="ttdPick($('#ttdReg').value)">Cek Lagi</button></div>`;
    return}
   TTDK=r.token;
@@ -417,7 +448,7 @@ async function ttdPoll(){
   clearInterval(TTDT);TTDK='';$('#ttdQr').style.display='none';el.className='qs er';el.textContent='Barcode sudah kedaluwarsa. Pilih ulang No Registrasi untuk membuat barcode baru.'}}
 async function ttdCopy(){try{await navigator.clipboard.writeText(ttdUrl(TTDK));toast('Link disalin')}catch(e){toast('Link tidak bisa disalin')}}
 
-// ---- sisi Pengemudi (dibuka lewat barcode, tanpa login) ----
+
 let SG={len:0};
 async function ttdPublic(tk){
  $('header').style.display='none';$('nav').style.display='none';
@@ -454,7 +485,7 @@ async function sgSend(){
   toast(m);b.disabled=false;b.textContent='Simpan'}}
 window.addEventListener('resize',()=>{if($('#sg')&&!SG.len)sgInit()});
 
-// ---- tile "TTD Pengemudi" di dashboard (hanya Operasi/admin) + pengait ke aplikasi ----
+
 function ttdTile(){
  if(P!='dash'||!ttdOk())return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
@@ -475,7 +506,7 @@ try{const f=render;render=function(){return P=='ttd'?ttdRender():f.apply(this,ar
 try{const f=nv;nv=function(){const p=P;if(p=='ttd')P='dash';try{return f.apply(this,arguments)}finally{P=p}}}catch(e){}
 try{const f=showLogin;showLogin=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
 try{const f=start;start=function(){return TTD_Q?ttdPublic(TTD_Q):f.apply(this,arguments)}}catch(e){}
-// ---- Estimasi Perbaikan (Input Bengkel): tulis angka bebas, contoh 2 | 1/2 | 2/7 | 2 1/7 ----
+
 try{const f=FM.Bengkel.f.find(x=>x[0]=='EstPerbaikan');if(f){f[2]='text';f[3]=''}}catch(e){}
 function estOk(v){
  v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
@@ -493,28 +524,28 @@ try{const f=save;save=function(){
  if(X=='Bengkel'){const el=$('#dataForm [name="EstPerbaikan"]');
   if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi Perbaikan hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}}
  return f.apply(this,arguments)}}catch(e){}
-// ---- Pilihan Point (Input PU) ----
-try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}  // pilihan Point di Input PU (nilai angka, tampilan pecahan)
-// ---- Estimasi Lama (Input LC): sama seperti Estimasi Perbaikan di Input Bengkel ----
+
+try{OPT.point=['0','0.5|1/2','1','1.5|1 1/2','2','2.5|2 1/2','3','3.5|3 1/2','4','4.5|4 1/2','5']}catch(e){}
+
 try{const f=fld;fld=function(a){if(a&&a[0]=='EstLama'&&a[2]=='sel')a=[a[0],a[1],'text','',a[4]];return f.call(this,a)}}catch(e){}
 new MutationObserver(()=>{const el=$('#lcForm [name="EstLama"]');if(!el||el.tagName!='INPUT'||el.dataset.est)return;el.dataset.est='1';el.setAttribute('placeholder','Contoh: 2   1/2   2/7   2 1/7');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','12');el.insertAdjacentHTML('afterend','<small>Tulis angka saja, tanpa huruf. Contoh: 2 · 1/2 · 2/7 · 2 1/7. Angka dan pecahan dipisah spasi.</small>')}).observe(V,{childList:true,subtree:true});
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.name=='EstLama'&&t.tagName=='INPUT'){const v=t.value.replace(/[^0-9\/ ]/g,'').replace(/ {2,}/g,' ');if(v!==t.value)t.value=v}});
 try{const f=saveLC;saveLC=function(){const el=$('#lcForm [name="EstLama"]');
  if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}
  return f.apply(this,arguments)}}catch(e){}
-// ---- Nomor MO (Input LC): diisi manual, tidak wajib, tampil di bawah Nomor Mobil ----
+
 try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',0])}}catch(e){}
 new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (tidak wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
-// ---- Estimasi: angka 0 boleh (mengganti aturan lama; fungsi estOk yang terakhir dipakai) ----
+
 function estOk(v){
  v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
  if(/^(0|[1-9]\d*)$/.test(v))return v;
  if((m=/^[1-9]\d* ([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
  if((m=/^([1-9]\d*)\/([1-9]\d*)$/.exec(v))&&+m[1]<+m[2])return v;
  return null}
-// petunjuk di bawah kolom estimasi ikut menyebut angka 0
+
 new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.textContent;if(x.indexOf('Tulis angka saja')==0&&x.indexOf('Contoh: 0')<0)s.textContent=x.replace('Contoh: 2 ·','Contoh: 0 · 2 ·')})}).observe(V,{childList:true,subtree:true});
-// ---- HURUF BESAR otomatis: Nama Pengemudi + No Mobil (Input Klaim), Nomor Mobil (Input LC) ----
+
 (function(){
  const Q='#dataForm [name="Nama"],#dataForm [name="NoMobil"],#lcForm [name="NoMobil"]';
  const up=t=>{if(!t||t.tagName!='INPUT'||!t.matches||!t.matches(Q))return;const u=t.value.toUpperCase();if(u===t.value)return;const a=t.selectionStart,b=t.selectionEnd;t.value=u;try{t.setSelectionRange(a,b)}catch(x){}};
@@ -525,11 +556,11 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
  try{const f=save;save=function(){all();return f.apply(this,arguments)}}catch(e){}
  try{const f=saveLC;saveLC=function(){all();return f.apply(this,arguments)}}catch(e){}
 })();
-// ---- FOTO: maksimal 5 per kolom + kompres otomatis (Foto Kerusakan, Foto Sebelum, Foto Sesudah/Selesai Perbaikan) ----
+
 (function(){
- const LIM={Foto:5,FotoSelesai:5,FotoSebelum:5,FotoSesudah:5};   // kolom foto lain (mis. Rincian) tidak dibatasi
- const STEPS=[[1280,.72],[1280,.62],[1152,.58],[1024,.52],[900,.48]],TARGET=250*1024;   // sisi terpanjang (px), kualitas JPEG
- const PEND={},isImg=f=>!f.type||/^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name||'');
+ const LIM={Foto:5,FotoSelesai:5,FotoSebelum:5,FotoSesudah:5};
+ const STEPS=[[1280,.72],[1280,.62],[1152,.58],[1024,.52],[900,.48]],TARGET=250*1024;
+ const PEND={},isImg=f=>!f.type||/^image\x2f/.test(f.type)||/\.(heic|heif)$/i.test(f.name||'');
  let chain=Promise.resolve();
  const fmt=kb=>kb>=1024?(kb/1024).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(kb))+' KB';
  const pending=()=>Object.keys(PEND).some(k=>PEND[k]>0);
@@ -573,7 +604,7 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
     .then(()=>{PEND[k]=Math.max(0,PEND[k]-1);try{if(PH===cur)drawPh(k)}catch(e){}})
     .catch(()=>{PEND[k]=Math.max(0,PEND[k]-1)})});
   if(take.length)deco(k)}
- // tangkap pilihan file lebih dulu daripada pengendali lama (addPh), supaya batas & kompres berlaku di semua form foto
+
  document.addEventListener('change',e=>{
   const el=e.target;if(!el||el.type!=='file'||!el.closest)return;
   const m=/addPh\('(\w+)'/.exec(el.getAttribute('onchange')||''),f=el.closest('.f'),ph=f&&f.querySelector('.ph[id^="ph_"]'),k=m?m[1]:ph?ph.id.slice(3):'';
@@ -581,9 +612,9 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
   e.stopImmediatePropagation();e.stopPropagation();terima(k,el)},true);
  try{window.addPh=terima}catch(e){}
  try{const f=window.drawPh;if(typeof f=='function'&&!f.__cnt){const g=function(k){const r=f.apply(this,arguments);try{deco(k)}catch(e){}return r};g.__cnt=1;window.drawPh=g}}catch(e){}
- // pasang penghitung "0/5 foto" begitu form dibuka
+
  new MutationObserver(()=>{V.querySelectorAll('.ph[id^="ph_"]').forEach(p=>deco(p.id.slice(3)))}).observe(V,{childList:true,subtree:true});
- // jangan simpan selagi foto masih diproses (nanti ada yang tertinggal)
+
  const busy=()=>{if(!pending())return false;toast('Foto masih diproses, tunggu sebentar lalu tekan Simpan lagi.');return true};
  try{const f=save;save=function(){if(busy())return;return f.apply(this,arguments)}}catch(e){}
  try{const f=saveLC;saveLC=function(){if(busy())return;return f.apply(this,arguments)}}catch(e){}
@@ -591,39 +622,39 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
  st.textContent='.phc{font-size:12px;color:#64748B;margin-top:6px}.phc.full{color:#B45309;font-weight:600}.up.full{opacity:.45;pointer-events:none}.ph div{width:calc((100% - 24px)/5);height:auto;aspect-ratio:1/1}.ph .kb{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62);color:#fff;font-size:10px;font-style:normal;text-align:center;padding:1px 0;line-height:1.3}';
  document.head.appendChild(st);
 })();
-// ---- LAPORAN LC: tombol "Laporan LC" di halaman Laporan (tabel LC per bulan, Excel / PDF / Cetak seperti laporan lain) ----
+
 (function(){
- try{if(typeof NM=='object'&&NM&&!NM.LC)NM.LC='LC'}catch(e){}   // judul "Laporan LC"
+ try{if(typeof NM=='object'&&NM&&!NM.LC)NM.LC='LC'}catch(e){}
  const st=document.createElement('style');
- st.textContent='.g5.g6{grid-template-columns:repeat(3,1fr)}.g5.g6 .tl{padding:12px 2px}';   // 6 tombol -> 3 kolom x 2 baris
+ st.textContent='.g5.g6{grid-template-columns:repeat(3,1fr)}.g5.g6 .tl{padding:12px 2px}';
  document.head.appendChild(st);
  const sync=()=>{
   const g=[...V.querySelectorAll('.g5')].find(x=>x.querySelector('button[onclick^="LT="]'));
   if(g){
    let b=g.querySelector('button[data-lc]');
    if(!b){
-    const bk=[...g.querySelectorAll('button.tl')].find(x=>/Bengkel/.test(x.getAttribute('onclick')||''));   // diletakkan setelah Laporan Bengkel
+    const bk=[...g.querySelectorAll('button.tl')].find(x=>/Bengkel/.test(x.getAttribute('onclick')||''));
     b=document.createElement('button');b.className='tl c5';b.setAttribute('data-lc','1');b.setAttribute('onclick',"LT='LC';vLap()");
     b.innerHTML=ic('car',26,'var(--fg)')+'<b>Laporan<br>LC</b>';
     if(bk)bk.after(b);else g.appendChild(b);
     g.classList.add('g6')}
    const on=typeof LT!='undefined'&&LT=='LC';
    if(b.classList.contains('sel')!==on)b.classList.toggle('sel',on)}
-  // beberapa foto dalam satu kolom: diberi nomor (Foto 1, Foto 2, ...) agar mudah dibedakan
+
   V.querySelectorAll('#lr td').forEach(td=>{
    if(td.dataset.n)return;td.dataset.n='1';
    const a=td.querySelectorAll('a[target="_blank"]');
    if(a.length>1)a.forEach((x,i)=>{if(x.textContent.trim()==='Foto')x.textContent='Foto '+(i+1)})})};
  new MutationObserver(sync).observe(V,{childList:true,subtree:true});
 })();
-// ---- Tile "TTD Pengemudi" di dashboard: TERLIHAT oleh semua akun (PU, Security, Bengkel, dst.), tapi hanya Operasi/admin yang bisa membukanya ----
+
 ttdTile=function(){
  if(P!='dash')return;
  const op=[...V.querySelectorAll('.tl')].find(b=>/Input\s*Operasi/i.test(b.textContent));
  if(!op||op.parentNode.querySelector('[data-ttd]'))return;
  const g=op.parentNode,t=op.cloneNode(true);
  t.setAttribute('data-ttd','1');t.className=op.className.replace(/\bc\d\b/,'c7');
- t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses TTD Pengemudi')");   // tanpa akses: hanya muncul pesan
+ t.setAttribute('onclick',ttdOk()?"go('ttd')":"toast('Akun Anda tidak punya akses TTD Pengemudi')");
  const sv=t.querySelector('svg');if(sv)sv.outerHTML=ic('sign',28,'var(--fg)');
  const setT=(e,v)=>{if(!e)return;const n=[...e.childNodes].find(x=>x.nodeType==3);if(n)n.nodeValue=v;else e.textContent=v};
  const b=t.querySelector('b'),n=t.querySelector('.n'),ch=t.querySelector('.ch');
@@ -631,15 +662,15 @@ ttdTile=function(){
  const pc=[...t.querySelectorAll('*')].find(e=>!e.children.length&&/^\s*\d+\s*%\s*$/.test(e.textContent));
  g.appendChild(t);g.classList.remove('g4');g.classList.add('g5','dg');
  run('ttdSummary',M).then(s=>{if(!t.isConnected)return;setT(n,String(s.ttd));if(pc)pc.textContent=(s.klaim?Math.round(s.ttd*100/s.klaim):0)+'%'}).catch(()=>{})};
- // ---- Input Klaim (Security): kolom "Jenis Kerusakan" dihilangkan dari form ----
-// Kolomnya tetap ada di Sheet supaya data lama aman. Saat data lama dipanggil lewat Revisi Registrasi, nilai lamanya ikut tersimpan kembali (tidak terhapus).
-try{const k=FM.Klaim.f.find(x=>x[0]=='Jenis');if(k)k[4]=0}catch(e){}   // tidak wajib lagi
-try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" name="Jenis">';return f.call(this,a)}}catch(e){}   // tidak ditampilkan
-// ---- SEMUA LAPORAN (Klaim, Bengkel, PU, Operasi, LC): pilihan Rekap Harian / Rekap Bulanan / Data Bulan ----
-// Tanggal yang dipakai = tanggal input data (sama seperti dashboard & laporan sebelumnya). Pengecualian: Rekap Harian Laporan Klaim memakai TANGGAL KEJADIAN. Laporan Frekuensi Pengemudi tidak diubah.
+
+
+try{const k=FM.Klaim.f.find(x=>x[0]=='Jenis');if(k)k[4]=0}catch(e){}
+try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" name="Jenis">';return f.call(this,a)}}catch(e){}
+
+
 (function(){
  const SB=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],HR=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
- // kategori = kolom yang dihitung per nilai; sums = kolom angka yang dijumlah (rp = rupiah, n = angka biasa)
+
  const ST=['Selesai','Tunda'];
  const CFG={
   Klaim:{cat:'JenisMobil',pr:['Stiker','Reguler','CNG'],sums:[]},
@@ -650,7 +681,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
  const dt=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):null};
  const dKey=r=>String(r.Tanggal||'').slice(0,10);
- const kKey=r=>{const k=String(r.TglKejadian||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dKey(r)};   // Klaim: tanggal kejadian (kosong -> tanggal input)
+ const kKey=r=>{const k=String(r.TglKejadian||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dKey(r)};
  const nextM=m=>{const y=+m.slice(0,4),mo=+m.slice(5);return mo==12?(y+1)+'-01':y+'-'+pad(mo+1)};
  const dShort=s=>{const d=dt(s);return d?d.getDate()+' '+SB[d.getMonth()]+' '+d.getFullYear():String(s)};
  const dLong=s=>{const d=dt(s);return d?HR[d.getDay()]+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear():String(s)};
@@ -669,7 +700,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  async function lapX(){
   const lr=$('#lr');if(!lr)return;const my=++seq,T=LT,cfg=CFG[T],nm=(typeof NM=='object'&&NM[T])||T;
   const per=$('#lb')&&$('#lb').closest('.cd');
-  if(per)per.style.display=mode=='hari'?'none':'';   // saat Rekap Harian, bulan & tahun ikut tanggal
+  if(per)per.style.display=mode=='hari'?'none':'';
   if(!day)day=ymd(new Date());
   let m;
   if(mode=='hari')m=day.slice(0,7);else m=$('#ly').value+'-'+String($('#lb').value).padStart(2,'0');
@@ -677,7 +708,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   if(mode=='hari'){const y=$('#ly'),b=$('#lb');if(y&&[...y.options].some(o=>o.value==m.slice(0,4)))y.value=m.slice(0,4);if(b)b.value=String(+m.slice(5))}
   lr.innerHTML='<p style="text-align:center;color:#5B6478">Memuat…</p>';
   let all,ext=[];
-  try{const kj=mode=='hari'&&T=='Klaim';   // Rekap Harian Klaim: kejadian bulan ini bisa baru diinput di bulan berikutnya
+  try{const kj=mode=='hari'&&T=='Klaim';
    const rs=await Promise.all([run('report',T,m)].concat(kj?[run('report',T,nextM(m)).catch(()=>[])]:[]));all=rs[0]||[];ext=rs[1]||[]}catch(e){if(my===seq){lr.innerHTML='';toast(e.message||'Gagal memuat laporan')}return}
   if(my!==seq)return;
   const cats=catList(all,cfg.cat,cfg.pr);
@@ -707,12 +738,12 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  window.lapStep=n=>{const d=dt(day)||new Date();d.setDate(d.getDate()+n);day=ymd(d);return showLap()};
  try{const f=showLap;showLap=function(){return typeof LT!='undefined'&&CFG[LT]?lapX():f.apply(this,arguments)}}catch(e){}
 })();
-// ---- UNDUH EXCEL (.xlsx) & PDF ASLI: bisa dibuka & dibagikan dari HP ----
-// Tombol "Excel" dan "PDF" di semua halaman Laporan membuat file sungguhan (bukan CSV / menu cetak),
-// lalu di HP dikirim lewat menu Bagikan (Simpan ke File, WhatsApp, Drive, dst). Tanpa pustaka luar.
+
+
+
 (function(){
  const enc=new TextEncoder(),csv0=(typeof csv=='function')?csv:null;
- // ===== ZIP (tanpa kompresi) =====
+
  const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
  const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=crcT[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
  function zip(files){
@@ -727,8 +758,8 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   const cl=cen.reduce((s,x)=>s+x.length,0),e=new DataView(new ArrayBuffer(22));
   e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cl,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
- // ===== EXCEL =====
- const bad=/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
+
+ const bad=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\ufffe\uffff]/g;
  const xe=s=>String(s).replace(bad,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
  const colL=i=>{let s='';for(i++;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s};
  const maxLine=v=>String(v==null?'':v).split('\n').reduce((m,x)=>Math.max(m,x.length),0);
@@ -743,20 +774,20 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   r++;r++;const hr=r;add(head.map((h,i)=>cs(i,h,2)));
   rows.forEach(row=>{r++;const tot=String(row[0])=='TOTAL';add(head.map((_,i)=>{const v=row[i];return typeof v=='number'&&isFinite(v)?cn(i,v,tot?5:3):cs(i,v==null?'':v,tot?5:3)}))});
   const cols=head.map((h,i)=>{let m=maxLine(h);rows.forEach(x=>{m=Math.max(m,Math.min(maxLine(x[i]),45))});return`<col min="${i+1}" max="${i+1}" width="${Math.min(60,Math.max(9,m+3))}" customWidth="1"/>`}).join('');
-    const M='http://schemas.openxmlformats.org/spreadsheetml/2006/main',RL='http://schemas.openxmlformats.org/officeDocument/2006/relationships',H='<'+'?xml version="1.0" encoding="UTF-8" standalone="yes"?'+'>\n';
+    const M='http:/\x2fschemas.openxmlformats.org/spreadsheetml/2006/main',RL='http:/\x2fschemas.openxmlformats.org/officeDocument/2006/relationships',H='<'+'?xml version="1.0" encoding="UTF-8" standalone="yes"?'+'>\n';
   const sheet=H+`<worksheet xmlns="${M}"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${hr}" topLeftCell="A${hr+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${R.join('')}</sheetData></worksheet>`;
   const bd='<border><left style="thin"><color rgb="FFBFC6D6"/></left><right style="thin"><color rgb="FFBFC6D6"/></right><top style="thin"><color rgb="FFBFC6D6"/></top><bottom style="thin"><color rgb="FFBFC6D6"/></bottom><diagonal/></border>';
   const fl=c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`;
   const styles=H+`<styleSheet xmlns="${M}"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fl('FFDCE8FA')}${fl('FFE2EEFF')}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${bd}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const nm=(String(title).replace(/[\[\]:*?\/\\]/g,'').trim().slice(0,31))||'Laporan';
   return zip([
-   ['[Content_Types].xml',H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
-   ['_rels/.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['[Content_Types].xml',H+'<Types xmlns="http:/\x2fschemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+   ['_rels/.rels',H+'<Relationships xmlns="http:/\x2fschemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http:/\x2fschemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
    ['xl/workbook.xml',H+`<workbook xmlns="${M}" xmlns:r="${RL}"><sheets><sheet name="${xe(nm)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
-   ['xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http:/\x2fschemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http:/\x2fschemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http:/\x2fschemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
    ['xl/styles.xml',styles],['xl/worksheets/sheet1.xml',sheet]])}
- // ===== PDF =====
- // lebar huruf Helvetica (per 1000), kode 32..126
+
+
  const HW=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
  const W1252={'€':128,'‚':130,'ƒ':131,'„':132,'…':133,'†':134,'‡':135,'ˆ':136,'‰':137,'Š':138,'‹':139,'Œ':140,'Ž':142,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'˜':152,'™':153,'š':154,'›':155,'œ':156,'ž':158,'Ÿ':159};
  const pc=ch=>{const c=ch.charCodeAt(0);if(c>=32&&c<127)return c;if(c>=160&&c<256)return c;if(W1252[ch])return W1252[ch];if(c==9||c==10||c==13)return 32;return 63};
@@ -765,7 +796,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  const hex=s=>{let o='';for(const ch of s){const k=pc(ch);o+=(k<16?'0':'')+k.toString(16)}return'<'+o+'>'};
  const nf=n=>String(+(+n).toFixed(2));
  const isUrl=x=>/^https?:/i.test(x);
- // isi sel -> paragraf -> kata (URL jadi tulisan "Foto", bisa diketuk)
+
  function paras(v){
   const ls=String(v==null?'':v).replace(bad,'').split('\n'),nu=ls.filter(x=>isUrl(x.trim())).length;let k=0;
   return ls.map(x=>{x=x.trim();if(isUrl(x)){k++;const u=x;return(nu>1?['Foto',String(k)]:['Foto']).map(t=>({t,u}))}return x?x.split(/\s+/).map(t=>({t})):[]})}
@@ -801,7 +832,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   const X=[];W.reduce((a,w,i)=>(X[i]=a,a+w),M);
   const lh=fs*1.25,mk=(ps,b)=>{const ls=ps.map((p,i)=>wrap(p,W[i]-2*px,fs,b,MAXL));const n=Math.max(1,...ls.map(l=>l.length));return{ls,h:n*lh+2*py}};
   const hd=mk(HP,true),rw=RP.map(r=>mk(r,false));
-  // judul + ringkasan (halaman 1)
+
   const topL=[];
   topL.push({t:'Monitoring KLAIM MW - Pool Margasatwa',fs:8,b:0,gap:11});
   topL.push({t:title,fs:15,b:1,gap:19});
@@ -811,7 +842,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   const newPage=first=>{pg={items:[]};pages.push(pg);y=PH-M;if(first){topL.forEach(l=>{y-=l.gap});y-=6}pg.items.push({r:hd,hdr:1,y});y-=hd.h};
   newPage(true);
   rw.forEach((r,i)=>{if(y-r.h<FOOT)newPage(false);pg.items.push({r,y,i});y-=r.h});
-  // gambar
+
   const objs=[],n=pages.length,when=new Date().toLocaleString('id-ID');
   objs.push('<< /Type /Catalog /Pages 2 0 R >>');
   objs.push('<< /Type /Pages /Kids ['+pages.map((_,i)=>(5+i*2)+' 0 R').join(' ')+'] /Count '+n+' >>');
@@ -851,7 +882,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R /Info '+ti+' 0 R >>\nstartxref\n'+xr+'\n%%EOF';
   const u=new Uint8Array(out.length);for(let i=0;i<out.length;i++)u[i]=out.charCodeAt(i)&255;
   return new Blob([u],{type:'application/pdf'})}
- // ===== ambil data laporan yang sedang tampil =====
+
  function ambil(){
   if(typeof LR=='undefined'||!LR||!LR.length)return null;
   const h0=(typeof LH!='undefined'&&LH)?LH.slice():Object.keys(LR[0]);
@@ -860,7 +891,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   const hd=document.querySelector('#lr .hd'),g=s=>{const e=hd&&hd.querySelector(s);return e?e.textContent.trim():''};
   const top=[...document.querySelectorAll('#lr .lcs div')].map(d=>{const b=d.querySelector('b'),s=d.querySelector('span');return[s?s.textContent.trim():'',b?b.textContent.trim():'']}).filter(x=>x[0]);
   return{head,rows,top,title:g('h3')||('Laporan '+((typeof NM=='object'&&NM[LT])||LT)),sub:g('small')}}
- // ===== kirim ke HP (menu Bagikan) atau unduh =====
+
  const mob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/i.test(navigator.platform));
  let busy=false;
  function kirim(blob,name){
@@ -892,12 +923,12 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   e.preventDefault();e.stopImmediatePropagation();unduh(t=='pdf'?'pdf':'xlsx')},true);
  try{csv=function(){unduh('xlsx')}}catch(e){}
 })();
-// ---- KATEGORI PU: kartu "Jenis Kerusakan" di dashboard ikut Input PU; "LC" dihapus dari pilihan Kategori PU ----
+
 (function(){
  const KAT=['R','SR','B','SB','KR','Subkon'],CLS=[5,2,6,3,1,7];
- // 1) form Input PU: pilihan Kategori tanpa LC (jumlah LC sudah muncul sendiri dari Input Bengkel / LC)
+
  try{OPT.kat=OPT.kat.filter(x=>x!='LC'&&x!='lc')}catch(e){}
- // 2) kartu "Jenis Kerusakan": isinya = jumlah Input PU per Kategori pada bulan yang dipilih
+
  const tiles=k=>KAT.map((j,i)=>`<div class="dm c${CLS[i]}"><b>${j}</b><div><span class="n">${k?(k[j]||0):'·'}</span> <small>Unit</small></div></div>`).join('');
  const card=()=>{const v=document.getElementById('v');return v?[...v.querySelectorAll('.cd')].find(c=>{const h=c.querySelector('h3');return h&&/Jenis Kerusakan/i.test(h.textContent)}):null};
  let seq=0;
@@ -909,7 +940,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   let k;
   try{const d=await run('dashboard',m);k=d&&d.kat}catch(e){if(sama())g.innerHTML=tiles({});if(sama()&&t)t.textContent='0 Unit';return}
   if(!sama())return;
-  if(!k){  // Code.gs belum diperbarui: hitung dari laporan PU
+  if(!k){
    k={};try{(await run('report','PU',m)||[]).forEach(r=>{const x=String(r.Kategori==null?'':r.Kategori).trim();if(x)k[x]=(k[x]||0)+1})}catch(e){}
    if(!sama())return}
   g.innerHTML=tiles(k);if(t)t.textContent=KAT.reduce((s,j)=>s+(k[j]||0),0)+' Unit'}
@@ -920,11 +951,11 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  try{const v=document.getElementById('v');if(v)new MutationObserver(cek).observe(v,{childList:true,subtree:true})}catch(e){}
 })();
 
-// ---- server Google lambat: tampilkan "Memuat…" lalu tombol "Coba lagi", bukan layar kosong ----
+
 (function(){try{
  const SLOW='Server Google sedang lambat, mohon tunggu sebentar…';
  const kartu=(judul,pesan)=>'<div class="cd" style="text-align:center"><h3 style="margin:0 0 6px">'+judul+'</h3><p style="color:#5B6478;margin:0 0 14px">'+esc(pesan)+'</p><button class="btn p" style="width:100%" id="rt">Coba lagi</button></div>';
- // layar pertama setelah login / saat aplikasi dibuka
+
  start=async function(){
   $('header').style.display='';$('nav').style.display='';
   V.innerHTML='<div style="text-align:center;color:#5B6478;padding:48px 16px"><p id="mmt" style="margin:0">Memuat data…</p></div>';
@@ -937,7 +968,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
    $('#rt').onclick=()=>start();
    return}
   clearTimeout(tm);go('dash')};
- // tombol Masuk: beri tahu bahwa sedang diproses
+
  doLogin=async function(){
   const b=$('#lbtn');if(!b||b.disabled)return;
   b.disabled=true;const t0=b.textContent;b.textContent='Memproses…';
@@ -945,7 +976,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
   const tm=setTimeout(()=>{h.textContent=SLOW},5000);
   try{const r=await raw('login',$('#lu').value,$('#lp').value);clearTimeout(tm);TK=r.token;U=r;try{localStorage.setItem('tk',TK)}catch(e){}start()}
   catch(e){clearTimeout(tm);h.textContent='';toast(e.message||'Login gagal');b.disabled=false;b.textContent=t0}};
- // halaman lain: kalau gagal dimuat jangan berhenti di "Memuat…"
+
  const _rn=render;let seq=0;
  const loading=()=>V.children.length==1&&V.firstElementChild.tagName=='P'&&V.textContent.trim().indexOf('Memuat')==0;
  render=async function(){
@@ -956,7 +987,7 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
    V.innerHTML=kartu('Data belum bisa dimuat','Server Google lambat atau tidak merespons.');
    $('#rt').onclick=()=>render()}};
 }catch(e){}})();
-// ---- TAMPILAN WEB (layar lebar / komputer): menu di kiri, isi lebih besar dan dua kolom. Tampilan HP TIDAK berubah. ----
+
 (function(){try{
  const css=`@media screen and (min-width:1000px){
 body{background:#F3F6FC}
@@ -1022,7 +1053,7 @@ body[data-p=login] #v>div{max-width:480px;margin:0 auto}
 .toast{bottom:36px;font-size:15px;padding:13px 22px}
 #app #dataForm,#app #lcForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px;align-content:start}
 #app #dataForm fieldset,#app #lcForm fieldset{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px}
-#app form .f:has(textarea),#app form .f:has(.up),#app form .f:has(.pa){grid-column:1/-1}
+#app form .f:has(textarea),#app form .f:has(.up),#app form .f:has(.pa),#app form .f:has(#estIn){grid-column:1/-1}
 #app #dataForm>.row,#app #lcForm>.row{grid-column:1/-1;justify-content:flex-start;margin-top:6px}
 #app #dataForm>.row .btn,#app #lcForm>.row .btn{flex:0 0 220px}
 body[data-p=set] #app #v>.cd{max-width:1000px}
@@ -1036,24 +1067,24 @@ body[data-p=input] #v{row-gap:20px}
 }
 `;
  const st=document.createElement('style');st.id='webcss';st.textContent=css;document.head.appendChild(st);
- // penanda halaman yang sedang dibuka (dipakai CSS di atas)
+
  const setP=p=>{try{document.body.setAttribute('data-p',p)}catch(e){}};
  const _go=go;go=function(p,x){setP(p);return _go.apply(this,arguments)};
  const _sl=showLogin;showLogin=function(){setP('login');return _sl.apply(this,arguments)};
 }catch(e){}})();
-// ---- LAPORAN KLAIM: data Klaim dan LC digabung dalam satu tabel (urut No Registrasi). Layar maksimal 15 baris; semua baris tetap ada di Excel / PDF / Cetak ----
-// Berlaku untuk Rekap Harian dan Data Bulan. Rekap Harian memakai TANGGAL KEJADIAN (Klaim: Tanggal Kejadian, LC: Tanggal Pekerjaan LC; kosong -> tanggal input). Angka ringkasan (Jumlah Klaim dst.) tetap menghitung Klaim saja. Rekap Bulanan tidak berubah.
+
+
 (function(){try{
- const MAXV=15;   // jumlah baris maksimal yang tampil di layar
+ const MAXV=15;
  const KOL=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail','WA','Foto','Petugas','Lokasi','LawanTabrak'];
  const st=document.createElement('style');
  st.textContent='@media screen{#lr tr.lx{display:none}}.lcg{font-size:12px;color:#5B6478;margin:10px 2px 0;line-height:1.5}';
  document.head.appendChild(st);
  const dk=r=>String((r&&r.Tanggal)||'').slice(0,10);
  const nr=r=>String((r&&r.NoReg)||'');
- const lcKey=x=>{const k=String((x&&x.TglPekerjaan)||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dk(x)};   // LC: tanggal kejadian = Tanggal Pekerjaan LC (kosong -> tanggal input)
+ const lcKey=x=>{const k=String((x&&x.TglPekerjaan)||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(k)?k:dk(x)};
  const nextM=m=>{const y=+m.slice(0,4),mo=+m.slice(5);return mo==12?(y+1)+'-01':y+'-'+String(mo+1).padStart(2,'0')};
- // satu baris LC -> bentuk kolom Klaim (kolom yang tidak ada di LC dikosongkan)
+
  const ubah=(x,keys)=>{
   const o={};keys.forEach(k=>{o[k]=''});
   o.NoReg=x.NoReg||'';o.Tanggal=x.Tanggal||'';o.Bulan=x.Bulan||'';o.TglKejadian=lcKey(x);
@@ -1071,7 +1102,7 @@ body[data-p=input] #v{row-gap:20px}
    if(my!==tok||typeof LT=='undefined'||LT!=='Klaim')return hasil;
    const lr=document.querySelector('#lr');if(!lr)return hasil;
    const hari=/^\d{4}-\d{2}-\d{2}$/.test(LP),bulan=/^\d{4}-\d{2}$/.test(LP);
-   if(!hari&&!bulan)return hasil;   // Rekap Bulanan: tidak diubah
+   if(!hari&&!bulan)return hasil;
    const body=lr.lastElementChild;if(!body||!body.classList.contains('cd'))return hasil;
    const m=LM;
    info(body,'Menggabungkan data LC…');
@@ -1079,11 +1110,11 @@ body[data-p=input] #v{row-gap:20px}
    try{const rs=await Promise.all([run('report','LC',m)].concat(hari?[run('report','LC',nextM(m)).catch(()=>[])]:[]));lc=(rs[0]||[]).concat(rs[1]||[])}catch(e){lc=null}
    if(my!==tok||LT!=='Klaim'||!body.isConnected)return hasil;
    const kl=Array.isArray(LR)?LR.slice():[];
-   const keys=kl.length?Object.keys(kl[0]):KOL;
+   const keys=KOL.concat(kl.length?Object.keys(kl[0]).filter(k=>KOL.indexOf(k)<0):[]);
    const lcr=(lc||[]).filter(x=>hari?lcKey(x)===LP:true).map(x=>ubah(x,keys));
    const all=kl.concat(lcr).sort((a,b)=>nr(a).localeCompare(nr(b),undefined,{numeric:true}));
    if(!all.length){const p=body.querySelector('.lcg');if(p)p.remove();return hasil}
-   LR=all;LH=null;   // Excel / PDF memakai semua baris
+   LR=all;LH=null;
    const tb=ganti(body,tbl(all,null));
    const trs=tb.querySelectorAll('tbody tr'),n=trs.length;
    trs.forEach((tr,i)=>{if(i<n-MAXV)tr.classList.add('lx')});
@@ -1094,30 +1125,30 @@ body[data-p=input] #v{row-gap:20px}
   }catch(e){try{console.error(e)}catch(_){}}
   return hasil};
 }catch(e){}})();
-// ---- PETUGAS CAT: peran baru "cat". Input Bengkel = foto selesai perbaikan saja. Input LC = nomor mobil + foto sebelum / selesai perbaikan. ----
-// Nama petugas (NIP - Nama) terisi OTOMATIS dari akun yang login (tidak perlu dipilih / diketik): akun Cat (kolom "Nama Petugas Cat" di Input Bengkel dan Input LC, sebelum upload foto)
-// dan juga akun Security, Bengkel, PU, Operasi (kolom "NIP & Nama Petugas" di form masing-masing). Akun admin tetap memilih sendiri.
-// Data dari petugas Cat tetap muncul di pilihan No Registrasi, supaya bisa dilengkapi petugas Bengkel.
-// Akun Cat dibuat di Pengaturan > Kelola Pengguna (peran: cat; isi Nama dan NIP).
+
+
+
+
+
 (function(){try{
  const isCat=()=>!!U&&U.peran=='cat';
- // Nama Petugas Cat otomatis = "NIP - Nama" akun yang login (sama dengan yang dicatat server)
+
  const catLabel=()=>{const n=String((U&&U.nama)||'').trim(),p=String((U&&U.nip)||'').trim();return p&&n.indexOf(p)<0?p+' - '+n:(n||String((U&&U.username)||''))};
  const AUTO=['security','bengkel','pu','operasi'],autoP=()=>!!U&&AUTO.indexOf(U.peran)>=0;
  const autoFix=root=>{const k=isCat()?'PetugasCat':autoP()?'Petugas':'';if(!k)return;const e=(root||document).querySelector('[name="'+k+'"]');if(e)e.value=catLabel()};
  try{RF.cat='Bengkel'}catch(e){}
  try{if(!SF.some(x=>x[0]=='petugasCat'))SF.push(['petugasCat','Daftar pilihan Petugas Cat untuk akun Bengkel (NIP - Nama, satu per baris, boleh kosong)','area'])}catch(e){}
 
- // ----- Input Bengkel -----
- // Semua akun: kolom "Nama Petugas Cat" sebelum foto. Akun Cat: HANYA Nama Petugas Cat + Foto Selesai Perbaikan.
+
+
  const BF=FM.Bengkel.f;
  if(!BF.some(x=>x[0]=='PetugasCat')){const i=BF.findIndex(x=>x[0]=='FotoSelesai');BF.splice(i<0?BF.length:i,0,['PetugasCat','Nama Petugas Cat','sel','petugasCat',0])}
  const fs0=BF.find(x=>x[0]=='FotoSelesai')||['FotoSelesai','Foto Selesai Perbaikan','foto','',1];
  const BCAT=[['PetugasCat','Nama Petugas Cat','text','',0],[fs0[0],fs0[1],fs0[2],fs0[3],1]];
  Object.defineProperty(FM.Bengkel,'f',{get:()=>isCat()?BCAT:BF,configurable:true});
 
- // ----- Input LC -----
- // Semua akun: kolom "Nama Petugas Cat" sebelum foto. Akun Cat: Nomor Mobil, Nama Petugas Cat, Foto Sebelum, Foto Selesai Perbaikan.
+
+
  let LFULL=null,LCAT=null;
  const useLC=()=>{
   if(!LFULL){
@@ -1127,16 +1158,16 @@ body[data-p=input] #v{row-gap:20px}
   LCF.splice(0,LCF.length,...(isCat()?LCAT:LFULL))};
  const lcOk=()=>!!U&&(U.peran=='admin'||U.peran=='bengkel'||U.peran=='cat');
 
- // akun lain: daftar nama petugas Cat kosong -> kolom nama berupa ketikan biasa
+
  try{const f=fld;fld=function(a){
-  // akun Security / Bengkel / PU / Operasi: kolom Petugas terisi otomatis dari login
+
   if(a&&a[0]=='Petugas'&&autoP())return`<label class="f"><span class="l">${a[1]}</span><input class="in" name="Petugas" readonly value="${esc(catLabel())}"><small>Terisi otomatis sesuai akun yang login.</small></label>`;
   if(a&&a[0]=='PetugasCat'){
-   // akun Cat: nama + NIP terisi otomatis dari login, tidak bisa diubah
+
    if(isCat())return`<label class="f"><span class="l">${a[1]}</span><input class="in" name="PetugasCat" readonly value="${esc(catLabel())}"><small>Terisi otomatis sesuai akun yang login.</small></label>`;
    if(a[2]=='sel'&&!String(S.petugasCat||'').split('\n').some(x=>x.trim()))a=[a[0],a[1],'text','',a[4]]}
   return f.call(this,a)}}catch(e){}
- // nama yang tersimpan tetap tampil walau sudah tidak ada di daftar Pengaturan
+
  const SV=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
  const patch=el=>{if(el.__cat)return;el.__cat=1;Object.defineProperty(el,'value',{configurable:true,get(){return SV.get.call(this)},set(v){
   v=v==null?'':String(v);
@@ -1145,24 +1176,24 @@ body[data-p=input] #v{row-gap:20px}
  const setV=(e,v)=>{if(e.tagName=='SELECT'&&v&&![...e.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=v;e.appendChild(o)}e.value=v};
  new MutationObserver(()=>{
   V.querySelectorAll('select[name="PetugasCat"]').forEach(patch);
-  const r=document.getElementById('ur');   // pilihan peran di Kelola Pengguna
+  const r=document.getElementById('ur');
   if(r&&r.tagName=='SELECT'&&!r.querySelector('option[value="cat"]'))r.insertAdjacentHTML('beforeend','<option value="cat">cat (Petugas Cat: foto Input Bengkel + Input LC)</option>');
-  const un=document.getElementById('un');   // kolom NIP di Kelola Pengguna (NIP + Nama akun otomatis jadi NIP & Nama Petugas di form input)
+  const un=document.getElementById('un');
   if(un&&!document.getElementById('unip')){const lb=un.closest('label');if(lb)lb.insertAdjacentHTML('afterend','<label class="f"><span class="l">NIP (dipakai otomatis sebagai NIP &amp; Nama Petugas di form input)</span><input class="in" id="unip" type="text" autocomplete="off" placeholder="Contoh: 123456"></label>')}
  }).observe(V,{childList:true,subtree:true});
 
- // Input Bengkel: data awal dari petugas Cat (belum lengkap) langsung bisa diisi, tidak terkunci
+
  try{const f=pick;pick=async function(){
   const r=await f.apply(this,arguments);
   try{if(X=='Bengkel'){const fs=$('#fs'),st=fs&&fs.querySelector('[name="Status"]');if(fs&&(!st||!st.value))fs.disabled=false}autoFix($('#fs'))}catch(e){}
   return r}}catch(e){}
 
- // menu Input Data: akun Cat melihat Input Bengkel + Input LC
+
  try{const f=vInput;vInput=async function(){
   await f.apply(this,arguments);
   if(isCat()&&!V.querySelector('button[onclick="go(\'form\',\'LC\')"]'))V.insertAdjacentHTML('beforeend',`<button class="mc c7" onclick="go('form','LC')"><div class="ico" style="width:64px;height:64px;background:rgba(255,255,255,.65)">${ic('car',36,'var(--fg)')}</div><div><b>Input LC</b><span>Input data LC kendaraan (Bengkel)</span></div>${ic('chevr',22,'var(--fg)')}</button>`)}}catch(e){}
 
- // Form Input LC: No Registrasi bisa dipilih ("Baru" atau nomor yang menunggu dilengkapi)
+
  vLC=async function(){
   head({t:'Input LC',s:'Bengkel - LC Kendaraan',i:'car',c:'#0E7490',back:'input'});PH={};
   if(!lcOk()){V.innerHTML='<div class="cd">Input LC hanya bisa dibuka oleh akun Bengkel.</div>';return}
@@ -1171,12 +1202,12 @@ body[data-p=input] #v{row-gap:20px}
   try{r=await run('regsPlus','LC','LC')}catch(e){if(/Sesi berakhir/.test(e.message))throw e;err=e.message||'gagal'}
   const okL=!!(r&&r.lc&&Array.isArray(r.list)),list=okL?r.list:[];
   const reg=(r&&r.next)||await run('nextReg').catch(()=>'otomatis');
-  // peringatan yang TERLIHAT bila daftar data petugas Cat gagal dimuat (jangan diam-diam kosong)
+
   const note=!okL?`<div class="info" id="lcNote" data-w="1" style="margin:0 0 12px;grid-column:1/-1;background:#FFF4E5;color:#8A4B00">${err?'Daftar data dari petugas Cat belum bisa dimuat ('+esc(err)+'). Server Google mungkin sedang lambat.':'Daftar data dari petugas Cat belum tersedia: Code.gs di Apps Script belum versi terbaru (belum di-deploy).'}<button type="button" class="btn s" style="margin-top:8px;width:100%" onclick="go('form','LC')">Coba lagi</button></div>`
    :(list.length&&!isCat()?`<div class="info" id="lcNote" style="margin:0 0 12px;grid-column:1/-1">Ada <b>${list.length}</b> data LC dari petugas Cat yang menunggu dilengkapi.</div>`:'');
   const hint=isCat()?'Biarkan "Baru" untuk data baru, atau pilih nomor yang sudah Anda isi untuk menambah foto.':'Biarkan "Baru" untuk input LC baru, atau pilih nomor yang menunggu untuk dilengkapi (data dari petugas Cat).';
   V.innerHTML=`<form class="cd" id="lcForm" onsubmit="return false">${note}<label class="f"><span class="l">Tanggal</span><input class="in" readonly value="${now()}"></label><label class="f"><span class="l">No Registrasi</span><select class="in" id="lcReg" onchange="lcPick(this.value)"><option value="">Baru - ${esc(reg)} (otomatis)</option>${list.map(x=>`<option value="${esc(x.v)}">${esc(x.l)}</option>`).join('')}</select><small>${hint}</small></label><input type="hidden" name="LanjutReg" value="">${LCF.map(fld).join('')}<button type="button" class="btn p" style="width:100%" onclick="saveLC()">${ic('save',20,'#fff')}Simpan</button></form>`;
-  // petugas Bengkel / admin: data pertama dari petugas Cat langsung ditampilkan (nomor mobil, nama petugas Cat, foto)
+
   if(okL&&list.length&&!isCat()){const sl=$('#lcReg');if(sl){sl.value=list[0].v;await lcPick(list[0].v)}}};
  window.lcPick=async function(v){
   const f=$('#lcForm');if(!f)return;
@@ -1189,30 +1220,30 @@ body[data-p=input] #v{row-gap:20px}
   try{
    const r=await run('getRecord','LC',v);
    if(!r){toast('Data tidak ditemukan');setNote('Data '+esc(v)+' tidak ditemukan.');return}
-   if(lj.value!==v)return;   // pilihan sudah diganti saat menunggu
+   if(lj.value!==v)return;
    f.querySelectorAll('[name]').forEach(e=>{if(e.name!=='LanjutReg')setV(e,r[e.name]||'')});
    LCF.filter(x=>x[2]=='foto').forEach(x=>{PH[x[0]]=r[x[0]]?r[x[0]].split('\n').filter(Boolean):[];drawPh(x[0])});
    autoFix(f);
    setNote(isCat()?'Menampilkan data <b>'+esc(v)+'</b>. Tambahkan foto lalu Simpan.':'Menampilkan data dari petugas Cat: <b>'+esc(v)+'</b>. Lengkapi data lalu Simpan. Untuk input LC baru, pilih "Baru" di No Registrasi.')
   }catch(e){toast(e.message||'Gagal memanggil data');setNote('Data '+esc(v)+' belum bisa dimuat. Pilih nomornya lagi di No Registrasi.')}};
- // akun Cat: nomor mobil + minimal satu foto (sebelum atau selesai perbaikan), lalu bisa langsung Simpan
+
  try{const f=saveLC;saveLC=function(){
   if(isCat()){
    const v=k=>{const e=$('#lcForm [name="'+k+'"]');return e?e.value.trim():''};
    if(!v('NoMobil'))return toast('Nomor Mobil wajib diisi');
    if(!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return toast('Upload minimal satu foto (sebelum atau selesai perbaikan)')}
   return f.apply(this,arguments)}}catch(e){}
- // Nama petugas otomatis tetap terisi setelah form memanggil data lama / membuat klaim baru, dan tepat sebelum Simpan
+
  try{const f=loadRevision;loadRevision=async function(){const r=await f.apply(this,arguments);try{autoFix($('#fs'))}catch(_){}return r}}catch(e){}
  try{const f=newClaim;newClaim=async function(){const r=await f.apply(this,arguments);try{autoFix($('#fs'))}catch(_){}return r}}catch(e){}
  try{const f=save;save=function(){try{autoFix($('#dataForm'))}catch(_){}return f.apply(this,arguments)}}catch(e){}
- // Kelola Pengguna: kolom NIP ikut dibaca dan disimpan
+
  try{const f=fillU;fillU=function(i){f.apply(this,arguments);try{const e=$('#unip'),x=US[i];if(e)e.value=(x&&x.NIP)||''}catch(_){}}}catch(e){}
  try{saveU=async function(){try{const n=$('#unip');await run('saveUser',{Username:$('#uu').value,Nama:$('#un').value,Password:$('#up').value,Peran:$('#ur').value,NIP:n?n.value.trim():undefined});toast('Pengguna tersimpan');go('dash')}catch(e){toast(e.message)}}}catch(e){}
 }catch(e){try{console.error(e)}catch(_){}}})();
-// ---- PREVIEW LAPORAN: tombol "Preview" di halaman Laporan -> semua data laporan yang sedang tampil dibuka di layar penuh (enak dibaca di HP) ----
-// Isinya sama dengan yang akan masuk Excel / PDF / Cetak (semua baris, tidak dibatasi 15 baris di layar). Bisa tampilan Kartu (per data) atau Tabel, ada kolom cari.
-// Tutup dengan tombol Tutup / X, tombol Kembali di HP, atau tombol Esc.
+
+
+
 (function(){try{
  const st=document.createElement('style');
  st.textContent='@media print{#pvO,.pvbtn{display:none!important}}.toast{z-index:10000!important}'
@@ -1250,7 +1281,7 @@ body[data-p=input] #v{row-gap:20px}
   +'@media(min-width:900px){#pvO .pvh,#pvO .pvt,#pvO .pvf{padding-left:max(12px,calc((100% - 1200px)/2));padding-right:max(12px,calc((100% - 1200px)/2))}#pvO .pvf .btn{max-width:240px}}';
  document.head.appendChild(st);
 
- // ---- ambil data laporan yang sedang tampil (sama dengan yang dipakai Excel / PDF) ----
+
  function data(){
   try{const u=window.unduhLaporan;if(u&&u.ambil){const d=u.ambil();if(d)return d}}catch(e){}
   if(typeof LR=='undefined'||!LR||!LR.length)return null;
@@ -1262,8 +1293,8 @@ body[data-p=input] #v{row-gap:20px}
   return{head,rows,top,title:g('h3')||'Laporan',sub:g('small')}}
  const lab=(h,i)=>{const s=String(h||'').replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').trim();return s||('Kolom '+(i+1))};
  const isTot=r=>String(r[0])=='TOTAL';
- // isi sel -> html (teks biasa + tombol Foto untuk alamat gambar)
- // HP tegak: tanggal ditulis ringkas (16/10 14:47) supaya muat; HP miring / komputer / Excel / PDF tetap lengkap
+
+
  const tglR=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?$/.exec(String(v==null?'':v).trim());return m?m[3]+'/'+m[2]+(m[4]?' '+m[4]:''):null};
  function val(v){
   const s=String(v==null?'':v).trim();if(!s)return '';
@@ -1294,32 +1325,32 @@ body[data-p=input] #v{row-gap:20px}
   const jc=D.head.indexOf('Jenis');
   if(view=='tabel'){
    lw=L.clientWidth;
-   const vc=D.vc=D.cols.filter(c=>!(D.head[c]=='Bulan'&&lw<600));   // kolom Bulan hanya di layar lebar (HP miring / komputer)
+   const vc=D.vc=D.cols.filter(c=>!(D.head[c]=='Bulan'&&lw<600));
    L.innerHTML='<table><thead><tr>'+vc.map(i=>'<th>'+esc(lab(D.head[i],i))+'</th>').join('')+'</tr></thead><tbody>'
     +idx.map(i=>{const r=D.rows[i];return'<tr'+(isTot(r)?' class="tot"':'')+'>'+vc.map(c=>'<td'+(c>0?' class="w"':'')+'>'+(lw<600&&tglR(r[c])||val(r[c]))+'</td>').join('')+'</tr>'}).join('')+'</tbody></table>';
    fit(L);
   }else{
-   const sk=D.head.indexOf('Bulan');   // kolom Bulan sama dengan tanggal, tidak perlu di kartu
+   const sk=D.head.indexOf('Bulan');
    L.innerHTML='<div class="pvg">'+idx.map(i=>{
     const r=D.rows[i],t=isTot(r),bd=jc>0?plain(r[jc]):'';
     return'<div class="pvk'+(t?' tot':'')+'"><h4>'+(t?'':'<span class="no">'+(i+1)+'</span>')+'<span class="tt">'+esc(plain(r[0]))+'</span>'+(bd?'<span class="bd">'+esc(bd)+'</span>':'')+'</h4>'
      +D.head.map((h,c)=>{if(c==0||c==sk||(c==jc&&bd))return'';const v=val(r[c]);return v?'<div class="pvr"><span>'+esc(lab(h,c))+'</span><em>'+v+'</em></div>':''}).join('')+'</div>'}).join('')+'</div>';
   }
   L.scrollTop=0}
- // TATA LETAK TABEL: kolom utama (No Reg ... Detail) dibuat muat di lebar layar: teks dibungkus ke baris bawah dan huruf diperkecil otomatis (13 -> 8 px).
- // Kolom lain (WA, Foto, Petugas, Lokasi, ...) ada di sebelah kanan: geser ke samping, atau miringkan HP supaya lebih lebar. Tombol A- / A+ mengatur huruf sendiri.
+
+
  const ZS=[8,9,10,11,12,13,14,16];
  const sum=(a,f)=>a.reduce((s,x,i)=>s+(f[i]?x:0),0);
  function fit(L){
   const t=L.querySelector('table');if(!t||!t.tHead)return;
   const ths=[].slice.call(t.tHead.rows[0].cells),pri=D.vc.map(c=>D.pri[c]),W=L.clientWidth-1;
-  const meas=m=>{   // lebar tiap kolom: mn = selebar kata terpanjang (paling rapat), mx = satu baris penuh
+  const meas=m=>{
    const g=t.querySelector('colgroup');if(g)g.remove();
    t.className=m;t.style.tableLayout='auto';t.style.minWidth='0';t.style.width=m=='mn'?'min-content':'max-content';
    return ths.map(h=>h.getBoundingClientRect().width)};
   const all=pri.map(()=>true),semua=pri.every(Boolean);
   let pr=pri,mn,mx,nat=false;
-  const coba=(flags,S)=>{   // cari huruf terbesar dari daftar S yang membuat kolom bertanda muat di layar
+  const coba=(flags,S)=>{
    for(let i=0;i<S.length;i++){
     L.style.setProperty('--pvf',S[i]+'px');
     mn=meas('mn');mx=meas('mx');
@@ -1328,8 +1359,8 @@ body[data-p=input] #v{row-gap:20px}
   if(fz){
    L.style.setProperty('--pvf',fz+'px');mn=meas('mn');mx=meas('mx');
    if(sum(mn.map(Math.ceil),all)<=W)pr=all}
-  else if(!semua&&coba(all,[13,12,11,10,9]))pr=all;   // layar lebar (HP miring / komputer): SEMUA kolom muat
-  else if(!coba(pri,[13,12,11,10,9,8.5,8])&&sum(mn.map(Math.ceil),pri)>W*1.3){L.style.setProperty('--pvf','10px');mn=meas('mn');mx=meas('mx');nat=true}   // terlalu banyak kolom utama: huruf 10 px, lebar alami, geser ke samping (kalau hanya kurang sedikit: tetap 8 px paling rapat)
+  else if(!semua&&coba(all,[13,12,11,10,9]))pr=all;
+  else if(!coba(pri,[13,12,11,10,9,8.5,8])&&sum(mn.map(Math.ceil),pri)>W*1.3){L.style.setProperty('--pvf','10px');mn=meas('mn');mx=meas('mx');nat=true}
   const mnC=mn.map(Math.ceil),sMn=sum(mnC,pr),sMx=sum(mx,pr);
   let w;
   if(nat)w=mx.map(x=>Math.ceil(Math.min(x,190)));
@@ -1357,21 +1388,21 @@ body[data-p=input] #v{row-gap:20px}
   isi()}
  function buka(){
   if(O)return;
-  // data LC sedang digabung ke tabel Klaim -> tunggu sebentar supaya isinya lengkap
+
   const g=document.querySelector('#lr .lcg');
   if(g&&/^Menggabungkan/.test(g.textContent))return toast('Data LC sedang digabung, coba lagi sebentar lagi');
   const d=data();
   if(!d||!d.rows.length)return toast('Belum ada data untuk dipreview');
   D=d;qs='';fz=0;
-  D.cols=d.head.map((h,i)=>i).filter(i=>i==0||d.rows.some(r=>plain(r[i])!==''));   // tabel preview: tanpa kolom yang kosong semua
-  const PRI=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail'];   // kolom utama: harus terlihat semua di HP tegak
+  D.cols=d.head.map((h,i)=>i).filter(i=>i==0||d.rows.some(r=>plain(r[i])!==''));
+  const PRI=['NoReg','Tanggal','Bulan','TglKejadian','JenisMobil','NIP','Nama','NoMobil','Jenis','Detail'];
   const adaPri=d.head.filter(h=>PRI.indexOf(h)>=0).length>=4;
   D.pri=d.head.map((h,i)=>i==0||!adaPri||PRI.indexOf(h)>=0);
   D.wrap=d.head.map((h,i)=>/^(Detail|Lokasi|LawanTabrak)$/.test(h)||d.rows.some(r=>plain(r[i]).length>28));
   const lcN=(typeof LT!='undefined'&&LT=='Klaim')?(()=>{const j=d.head.indexOf('Jenis');return j>0?d.rows.filter(r=>plain(r[j])=='LC').length:0})():0;
   const n=d.rows.filter(r=>!isTot(r)).length;
   const sub=[d.sub,n+' data'+(lcN?' (Klaim '+(n-lcN)+' · LC '+lcN+')':'')].filter(Boolean).join(' · ');
-  view=vpref||'tabel';   // tampilan awal = Tabel rapat (banyak baris sekaligus); pilihan Kartu/Tabel diingat
+  view=vpref||'tabel';
   prevFocus=document.activeElement;
   O=document.createElement('div');O.id='pvO';O.setAttribute('role','dialog');O.setAttribute('aria-modal','true');O.setAttribute('aria-label','Preview '+d.title);
   O.innerHTML='<div class="pvh"><div class="pvhd"><b>'+esc(d.title)+'</b><small>'+esc(sub)+'</small></div><button type="button" class="pvx" data-a="x" aria-label="Tutup preview">✕</button></div>'
@@ -1393,11 +1424,11 @@ body[data-p=input] #v{row-gap:20px}
   try{history.pushState({pv:1},'');pushed=true}catch(e){pushed=false}
   setView(view);
   try{O.querySelector('.pvx').focus({preventScroll:true})}catch(e){}}
- // HP dimiringkan / ukuran layar berubah -> tata letak tabel dihitung ulang
+
  window.addEventListener('resize',()=>{if(!O)return;clearTimeout(rt);rt=setTimeout(()=>{const L=O&&O.querySelector('.pvl');if(!L||L.clientWidth===lw)return;isi()},150)});
  window.previewLaporan={buka,tutup};
 
- // ---- tombol "Preview" di kartu laporan (di atas tombol Excel / PDF / Cetak) ----
+
  const jml=()=>{try{const d=data();return d?d.rows.filter(r=>!isTot(r)).length:0}catch(e){return 0}};
  const IKON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
  function pasang(){
@@ -1415,7 +1446,7 @@ body[data-p=input] #v{row-gap:20px}
  new MutationObserver(()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;try{pasang()}catch(e){}})}).observe(root,{childList:true,subtree:true});
  pasang();
 }catch(e){try{console.error(e)}catch(_){}}})();
-// ---- ACC ADMIN: nomor mobil yang sama 2x dalam 1 bulan di Input LC (petugas Cat) ----
+
 (function(){try{
  const isCat=()=>!!U&&U.peran=='cat',isAdm=()=>!!U&&U.peran=='admin';
  {const s=document.createElement('style');s.textContent=`
@@ -1429,27 +1460,27 @@ body[data-p=input] #v{row-gap:20px}
 .accS{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;vertical-align:middle}
 .accS.Menunggu{background:#FFF1D6;color:#B45309}.accS.ACC{background:#DFF6E6;color:#15803D}.accS.Ditolak{background:#FDE4E4;color:#B91C1C}.accS.Terpakai{background:#E9ECF2;color:#5B6478}
 .accR .row{margin-top:8px;gap:8px}.accR .btn{min-height:40px;font-size:13px}`;document.head.appendChild(s)}
- // ---------- petugas Cat: dialog yang tetap tampil sampai ditutup (toast 3 detik terlalu singkat) ----------
+
  window.accDlg=function(msg){
   const old=document.getElementById('accDlg');if(old)old.remove();
   const d=document.createElement('div');d.className='accO';d.id='accDlg';
   d.innerHTML='<div class="accB" role="alertdialog" aria-modal="true"><h3>Perlu ACC Admin</h3><p>'+esc(msg)+'</p><button type="button" class="btn p" style="width:100%">Mengerti</button></div>';
   d.querySelector('button').onclick=()=>d.remove();
   document.body.appendChild(d)};
- // periksa nomor mobil SEBELUM foto diunggah; galat jaringan -> lanjut simpan biasa (server tetap memeriksa lagi)
+
  try{const f=saveLC;saveLC=async function(){
   if(!isCat())return f.apply(this,arguments);
   const form=$('#lcForm');if(!form)return f.apply(this,arguments);
   const g=k=>{const e=form.querySelector('[name="'+k+'"]');return e?e.value.trim():''};
   const no=g('NoMobil');
-  if(!no||!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return f.apply(this,arguments);  // data belum lengkap: pesan bawaan form yang tampil
+  if(!no||!['FotoSebelum','FotoSesudah'].some(k=>(PH[k]||[]).length))return f.apply(this,arguments);
   if(window.ACCC||window.SV)return;
   window.ACCC=true;toast('Memeriksa nomor mobil…');
   try{await run('lcCek',no,g('LanjutReg'))}
   catch(e){const m=String((e&&e.message)||'');if(/ACC/.test(m)){accDlg(m);return}}
   finally{window.ACCC=false}
   return f.apply(this,arguments)}}catch(e){}
- // ---------- admin: daftar permintaan ACC ----------
+
  let AL=[];
  const row=(x,i)=>{
   const b=(k,t,c)=>`<button type="button" class="btn ${c}" onclick="accKep(${i},'${k}')">${t}</button>`;
@@ -1476,24 +1507,27 @@ body[data-p=input] #v{row-gap:20px}
   first.insertAdjacentHTML('afterend','<div class="cd" id="accCd"><p style="color:var(--m);font-size:13.5px;margin:4px 0">Memuat permintaan ACC…</p></div>');
   try{AL=await run('accList');paint()}
   catch(e){const c=document.getElementById('accCd');if(c)c.innerHTML='<p style="color:#B91C1C;font-size:13.5px;margin:4px 0">Daftar ACC belum bisa dimuat: '+esc(e.message||'')+'</p>'}}}catch(e){}
- // ---------- admin: pemberitahuan di Dashboard bila ada yang menunggu ----------
- try{const f=vDash;vDash=async function(){
-  const r=await f.apply(this,arguments);
-  if(isAdm())run('accList').then(l=>{
+
+ window.accBnRefresh=function(){
+  if(!isAdm()||P!='dash')return;
+  run('accList').then(l=>{
    if(P!='dash'||!isAdm())return;
    const o=document.getElementById('accBn');if(o)o.remove();
    const n=(l||[]).filter(x=>x.Status=='Menunggu').length;
-   if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC Input LC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{});
+   if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC Input LC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{})};
+ try{const f=vDash;vDash=async function(){
+  const r=await f.apply(this,arguments);
+  window.accBnRefresh();
   return r}}catch(e){}
 }catch(e){try{console.error(e)}catch(_){}}})();
-// ---- NOMOR REGISTRASI KLAIM MENGIKUTI TGL KEJADIAN: pratinjau nomor di form ikut berubah saat Tgl Kejadian dipilih ----
+
 (function(){try{
  let tok=0;
  document.addEventListener('change',async function(ev){
   try{
    const e=ev.target;
    if(!e||e.name!=='TglKejadian'||X!=='Klaim'||P!=='form')return;
-   const n=$('#NoReg');if(!n||n.dataset.s)return;   // revisi: nomor lama tidak berubah
+   const n=$('#NoReg');if(!n||n.dataset.s)return;
    const my=++tok;
    const r=await run('nextReg',e.value||'');
    if(my!==tok||$('#NoReg')!==n||n.dataset.s||typeof r!=='string'||!r)return;
@@ -1504,8 +1538,8 @@ body[data-p=input] #v{row-gap:20px}
   }catch(_){}
  })
 }catch(e){try{console.error(e)}catch(_){}}})();
-// ================= akhir TTD PENGEMUDI =================
-// ---- login ----
+
+
 function showLogin(){
  TK='';U=null;try{localStorage.removeItem('tk')}catch(e){}
  $('header').style.display='none';$('nav').style.display='none';
