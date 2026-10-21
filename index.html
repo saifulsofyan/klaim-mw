@@ -50,7 +50,7 @@ textarea.in{height:90px;padding:10px;resize:vertical}.in[readonly]{background:#F
 fieldset{border:0;padding:0;margin:0;min-width:0}
 .row{display:flex;gap:10px}
 .btn{flex:1;min-height:48px;border:0;border-radius:12px;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}.p{background:var(--b);color:#fff}.s{background:#E9ECF2;color:var(--t)}
-.up{display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px dashed #B7C4E6;border-radius:10px;padding:14px;margin-top:6px;color:var(--b);font-size:13px;font-weight:700;cursor:pointer}
+.upr{display:flex;gap:8px}.upr .up{flex:1;flex-direction:column;gap:2px;text-align:center;margin-top:6px}.upr .up small{font-size:11px;font-weight:600;opacity:.8}.up.cam{background:var(--b);border:1.5px solid var(--b);color:#fff}.up{display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px dashed #B7C4E6;border-radius:10px;padding:14px;margin-top:6px;color:var(--b);font-size:13px;font-weight:700;cursor:pointer}
 .ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ph div{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;background:#EEE}.ph img{width:100%;height:100%;object-fit:cover}
 .ph button{position:absolute;top:2px;right:2px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;line-height:1}
 .pa{background:#F1F3F8;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}.pa b{font-size:28px}
@@ -80,8 +80,9 @@ Bengkel:{t:'Input Bengkel',s:'Bengkel - Klaim Kendaraan',i:'wrench',c:'#1D4ED8',
 PU:{t:'Input PU',s:'PU - Klaim Kendaraan',i:'clip',c:'#15803D',f:[['Kategori','Kategori','sel','kat',1],['Point','Point','sel','point',1],['pa','Total Point Aktif','calc'],['est','Estimasi Biaya Bengkel','est'],['Dedaan','Dedaan (Rp.)','num','',1],['Petugas','NIP & Nama Petugas','sel','petugasPU',1]]},
 Operasi:{t:'Input Operasi',s:'Operasi - Klaim Kendaraan',i:'clip',c:'#B45309',f:[['Situasi','Situasi Kejadian','area','',1],['Waktu','Waktu Kejadian (jam)','time','',1],['Tamu','Tamu','sel','tamu',1],['JenisMobil','Jenis Mobil','sel','mobil',1],['Planning','Planning','sel','plan',1],['HariKerja','Hari Kerja','num','',1],['Tindakan','Tindakan kepada Pengemudi','sel','tindakan',1],['Petugas','NIP Petugas Operasi','sel','petugasOps',1]]}};
 const SF=[['pool','Nama Pool','text'],['kepala','Kepala Bengkel','text'],['petugas','Petugas Security (NIP - Nama, satu per baris)','area'],['petugasOps','Petugas Operasi (NIP - Nama, satu per baris)','area'],['petugasBengkel','Petugas Bengkel (NIP - Nama, satu per baris)','area'],['petugasPU','Petugas PU (NIP - Nama, satu per baris)','area']];
+const PDFK={Rincian:1};
 const NM={Klaim:'Klaim',Bengkel:'Bengkel',PU:'PU',Operasi:'Operasi',Frek:'Frekuensi Pengemudi'};
-const IC={menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',home:'<path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z"/>',file:'<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/>',plus:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',gear:'<circle cx="12" cy="12" r="7" stroke-width="4" stroke-dasharray="3.2 2.2"/><circle cx="12" cy="12" r="3"/>',shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 5-5"/>',wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',clip:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h6"/>',cal:'<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/>',chevr:'<path d="M9 6l6 6-6 6"/>',users:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/>',car:'<path d="M5 16v-4l2-5h10l2 5v4zM5 16v3h3v-3M16 16v3h3v-3M7 12h10"/>',search:'<circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/>',pencil:'<path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/>',save:'<path d="M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7"/>',upload:'<path d="M7 18a4 4 0 0 1-1-7.9A6 6 0 0 1 17.7 9 4.5 4.5 0 0 1 17 18zM12 16v-6M9 12l3-3 3 3"/>'};
+const IC={cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',home:'<path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z"/>',file:'<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/>',plus:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',gear:'<circle cx="12" cy="12" r="7" stroke-width="4" stroke-dasharray="3.2 2.2"/><circle cx="12" cy="12" r="3"/>',shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 5-5"/>',wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',clip:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h6"/>',cal:'<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/>',chevr:'<path d="M9 6l6 6-6 6"/>',users:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/>',car:'<path d="M5 16v-4l2-5h10l2 5v4zM5 16v3h3v-3M16 16v3h3v-3M7 12h10"/>',search:'<circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/>',pencil:'<path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/>',save:'<path d="M5 3h11l3 3v15H5zM8 3v6h7V3M8 21v-7h8v7"/>',upload:'<path d="M7 18a4 4 0 0 1-1-7.9A6 6 0 0 1 17.7 9 4.5 4.5 0 0 1 17 18zM12 16v-6M9 12l3-3 3 3"/>'};
 
 const $=s=>document.querySelector(s),V=$('#v');
 const ic=(n,s=24,c='currentColor')=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
@@ -135,7 +136,8 @@ function fld([k,l,t,o,r]){
  const p=l.toLowerCase(),q=r?'<b class="rq"> *</b>':'',h=`<label class="f"><span class="l">${l}${q}</span>`;
  if(t=='calc')return`<div class="f"><span class="l">${l}</span><div class="pa"><span>Total point pengemudi<br><small>dalam 6 bulan terakhir</small></span><span><b id="pv">0.0</b> Point</span></div><div class="info">Total point dihitung otomatis berdasarkan jumlah klaim yang sudah tercatat untuk NIP pengemudi ini dalam 6 bulan terakhir.</div></div>`;
  if(t=='est')return`<div class="f"><span class="l">${l}</span><input class="in" id="estIn" readonly value="Memuat…"><small id="estInfo">Mengambil estimasi dari Input Bengkel…</small></div>`;
- if(t=='foto')return`<div class="f"><span class="l">${l}${q}</span><label class="up">${ic('upload',24,'#0B5ED7')}Klik untuk upload foto (JPG, PNG)<input type="file" accept="image/\x2a" multiple hidden onchange="addPh('${k}',this)"></label><div class="ph" id="ph_${k}"></div></div>`;
+ if(t=='foto'&&U&&U.peran=='cat')return`<div class="f"><span class="l">${l}${q}</span><div class="upr"><label class="up cam">${ic('cam',26,'#fff')}Ambil Foto<small>buka kamera</small><input type="file" accept="image/\x2a" capture="environment" hidden onchange="addPh('${k}',this)"></label><label class="up">${ic('upload',24,'#0B5ED7')}Dari Galeri<small>pilih foto</small><input type="file" accept="image/\x2a" multiple hidden onchange="addPh('${k}',this)"></label></div><div class="ph" id="ph_${k}"></div></div>`;
+ if(t=='foto')return`<div class="f"><span class="l">${l}${q}</span><label class="up">${ic('upload',24,'#0B5ED7')}${PDFK[k]?'Klik untuk upload foto atau PDF (JPG, PNG, PDF)':'Klik untuk upload foto (JPG, PNG)'}<input type="file" accept="${PDFK[k]?'image/\x2a,application/pdf,.pdf':'image/\x2a'}" multiple hidden onchange="addPh('${k}',this)"></label><div class="ph" id="ph_${k}"></div></div>`;
  if(t=='area')return h+`<textarea class="in" name="${k}" maxlength="500" placeholder="Jelaskan ${p}"></textarea></label>`;
  if(t=='sel')return h+`<select class="in" name="${k}"><option value="">Pilih ${p}</option>${opt(OPT[o]||(S[o]||'').split('\n').filter(Boolean))}</select></label>`;
  return h+`<input class="in" name="${k}" type="${t=='num'?'number':t}"${t=='num'?' inputmode="numeric" min="0"':''} placeholder="Masukkan ${p}"></label>`}
@@ -214,7 +216,7 @@ async function newClaim(){
  }catch(e){toast(e.message||'Gagal membuat klaim baru')}
 }
 function addPh(k,el){PH[k]=PH[k]||[];[...el.files].forEach(f=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,1000/Math.max(im.width,im.height));c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);PH[k].push({data:c.toDataURL('image/jpeg',.7),name:f.name.replace(/\.\w+$/,'')+'.jpg'});drawPh(k)};im.src=r.result};r.readAsDataURL(f)});el.value=''}
-function drawPh(k){$('#ph_'+k).innerHTML=PH[k].map((p,i)=>`<div><img src="${p.data||esc(p)}" alt="Foto"><button type="button" aria-label="Hapus" onclick="PH['${k}'].splice(${i},1);drawPh('${k}')">×</button></div>`).join('')}
+function drawPh(k){$('#ph_'+k).innerHTML=PH[k].map((p,i)=>{const pdf=!!p.pdf||isPdfU(p.data||p),t=p.data?'span class="pd"':'a href="'+esc(p)+'" target="_blank" rel="noopener"';return`<div${pdf?' class="pdf"':''}>${pdf?`<${t}>${ic('file',30,'#B42318')}PDF<small>${esc(p.name||'Buka')}</small></${p.data?'span':'a'}>`:`<img src="${p.data||esc(p)}" alt="Foto">`}<button type="button" aria-label="Hapus" onclick="PH['${k}'].splice(${i},1);drawPh('${k}')">×</button></div>`}).join('')}
 async function save(){
  if(X=='PU'&&!PUOK)return toast('Estimasi Biaya Bengkel belum diisi. Tunggu input dari Bengkel dulu.');
  const d={};$('#dataForm').querySelectorAll('[name]').forEach(e=>d[e.name]=e.value.trim());
@@ -232,7 +234,8 @@ async function save(){
  finally{window.SV=false}}
 
 
-const cell=v=>String(v).split('\n').map(x=>/^https?:/.test(x)?`<a href="${esc(x)}" target="_blank">Foto</a>`:esc(x)).join(' ');
+const isPdfU=u=>/drive\.google\.com\x2ffile\x2fd\x2f/.test(u)||/^data:application\/pdf/.test(u),lnkL=u=>isPdfU(u)?'PDF':'Foto';
+const cell=v=>String(v).split('\n').map(x=>/^https?:/.test(x)?`<a href="${esc(x)}" target="_blank">${lnkL(x)}</a>`:esc(x)).join(' ');
 const tbl=(r,h)=>r.length?`<div class="tb"><table><thead><tr>${(h||Object.keys(r[0])).map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${r.map(x=>`<tr>${Object.values(x).map(v=>`<td>${cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p style="text-align:center;color:#5B6478">Belum ada data.</p>';
 const FH=()=>['NIP','Nama','Jumlah Point','Jumlah Klaim '+bl(),'Total Point','Jumlah Klaim 6 Bulan'];
 
@@ -560,7 +563,7 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
 (function(){
  const LIM={Foto:5,FotoSelesai:5,FotoSebelum:5,FotoSesudah:5};
  const STEPS=[[1280,.72],[1280,.62],[1152,.58],[1024,.52],[900,.48]],TARGET=250*1024;
- const PEND={},isImg=f=>!f.type||/^image\x2f/.test(f.type)||/\.(heic|heif)$/i.test(f.name||'');
+ const PEND={},isImg=f=>!f.type||/^image\x2f/.test(f.type)||/\.(heic|heif)$/i.test(f.name||''),isPdf=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name||''),PDFMAX=8*1024*1024;
  let chain=Promise.resolve();
  const fmt=kb=>kb>=1024?(kb/1024).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(kb))+' KB';
  const pending=()=>Object.keys(PEND).some(k=>PEND[k]>0);
@@ -577,30 +580,39 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
    ok({data:d,name:(file.name||'foto').replace(/\.\w+$/,'')+'.jpg',kb:Math.round((d.length-23)*.75/1024),o:Math.round(file.size/1024)})
   }catch(e){URL.revokeObjectURL(u);no(e)}};
   im.src=u})}
+
+ function readPdf(f){return new Promise((ok,no)=>{
+  const bad=m=>{const e=new Error(m);e.pdfMsg=1;no(e)};
+  if(f.size>PDFMAX)return bad('PDF "'+(f.name||'')+'" terlalu besar ('+fmt(Math.round(f.size/1024))+'). Maksimal 8 MB.');
+  const r=new FileReader();
+  r.onload=()=>{const d=String(r.result||'').replace(/^data:[^;,]*/,'data:application/pdf');if(!/^data:application\/pdf;base64,/.test(d))return bad('PDF "'+(f.name||'')+'" tidak bisa dibaca.');
+   const nm=(f.name||'rincian').replace(/[^\w.\- ]+/g,'_'),kb=Math.max(1,Math.round(f.size/1024));ok({data:d,name:/\.pdf$/i.test(nm)?nm:nm+'.pdf',kb:kb,o:kb,pdf:true})};
+  r.onerror=()=>bad('PDF "'+(f.name||'')+'" tidak bisa dibaca.');
+  r.readAsDataURL(f)})}
  function deco(k){
   const ph=document.getElementById('ph_'+k);if(!ph)return;
   let c=ph.previousElementSibling;if(!c||!c.classList.contains('phc')){ph.insertAdjacentHTML('beforebegin','<div class="phc"></div>');c=ph.previousElementSibling}
   const a=PH[k]||[],n=a.length,lim=LIM[k]||0,w=PEND[k]||0,it=a.filter(p=>p&&p.kb),full=!!lim&&n+w>=lim;
-  let t=(lim?n+'/'+lim:n)+' foto';
+  const pk=!!PDFK[k];let t=(lim?n+'/'+lim:n)+(pk?' file':' foto');
   if(w>0)t+=' · memproses '+w+' foto…';
   else if(full)t+=' · penuh, tekan × untuk ganti';
-  else t+=' · otomatis dikompres';
+  else t+=pk?' · foto dikompres otomatis, PDF dikirim apa adanya':' · otomatis dikompres';
   if(it.length&&!w){const o=it.reduce((s,p)=>s+p.o,0),z=it.reduce((s,p)=>s+p.kb,0);if(o>z*1.2)t+=' ('+fmt(o)+' → '+fmt(z)+')'}
   if(c.textContent!==t)c.textContent=t;
   c.classList.toggle('full',full);
-  const lb=ph.parentNode.querySelector('label.up');if(lb){lb.classList.toggle('full',full);const inp=lb.querySelector('input[type=file]');if(inp&&inp.disabled!==full)inp.disabled=full}
+  ph.parentNode.querySelectorAll('label.up').forEach(lb=>{lb.classList.toggle('full',full);const inp=lb.querySelector('input[type=file]');if(inp&&inp.disabled!==full)inp.disabled=full});
   [].slice.call(ph.children).forEach((d,i)=>{const p=a[i];if(p&&p.kb&&!d.querySelector('.kb'))d.insertAdjacentHTML('beforeend','<i class="kb">'+fmt(p.kb)+'</i>')})}
  function terima(k,el){
-  const all=[].slice.call(el.files||[]),files=all.filter(isImg);el.value='';
+  const all=[].slice.call(el.files||[]),files=all.filter(f=>isPdf(f)?!!PDFK[k]:isImg(f));el.value='';
   if(!all.length)return;
-  if(!files.length)return toast('Pilih file foto (JPG atau PNG).');
+  if(!files.length)return toast(PDFK[k]?'Pilih file foto (JPG, PNG) atau PDF.':'Pilih file foto (JPG atau PNG).');
   PH[k]=PH[k]||[];PEND[k]=PEND[k]||0;
   const cur=PH,lim=LIM[k]||0,room=lim?Math.max(0,lim-PH[k].length-PEND[k]):files.length,take=files.slice(0,room),skip=files.length-take.length;
   if(skip>0)toast(take.length?'Maksimal '+lim+' foto. '+skip+' foto terakhir tidak dimasukkan.':'Maksimal '+lim+' foto sudah tercapai. Hapus salah satu (×) kalau mau ganti.');
   take.forEach(f=>{
    PEND[k]++;
-   chain=chain.then(()=>shrink(f))
-    .then(p=>{if(PH===cur&&PH[k])PH[k].push(p)},()=>{toast('Foto "'+(f.name||'')+'" tidak bisa dibaca. Coba foto lain.')})
+   chain=chain.then(()=>isPdf(f)?readPdf(f):shrink(f))
+    .then(p=>{if(PH===cur&&PH[k])PH[k].push(p)},e=>{toast(e&&e.pdfMsg?e.message:'Foto "'+(f.name||'')+'" tidak bisa dibaca. Coba foto lain.')})
     .then(()=>{PEND[k]=Math.max(0,PEND[k]-1);try{if(PH===cur)drawPh(k)}catch(e){}})
     .catch(()=>{PEND[k]=Math.max(0,PEND[k]-1)})});
   if(take.length)deco(k)}
@@ -619,7 +631,7 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
  try{const f=save;save=function(){if(busy())return;return f.apply(this,arguments)}}catch(e){}
  try{const f=saveLC;saveLC=function(){if(busy())return;return f.apply(this,arguments)}}catch(e){}
  const st=document.createElement('style');
- st.textContent='.phc{font-size:12px;color:#64748B;margin-top:6px}.phc.full{color:#B45309;font-weight:600}.up.full{opacity:.45;pointer-events:none}.ph div{width:calc((100% - 24px)/5);height:auto;aspect-ratio:1/1}.ph .kb{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62);color:#fff;font-size:10px;font-style:normal;text-align:center;padding:1px 0;line-height:1.3}';
+ st.textContent='.phc{font-size:12px;color:#64748B;margin-top:6px}.phc.full{color:#B45309;font-weight:600}.up.full{opacity:.45;pointer-events:none}.ph div{width:calc((100% - 24px)/5);height:auto;aspect-ratio:1/1}.ph .pdf{background:#FDECEC}.ph .pdf a,.ph .pdf .pd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;height:100%;box-sizing:border-box;padding:4px;color:#B42318;font-size:12px;font-weight:800;text-decoration:none;text-align:center}.ph .pdf small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:600;color:#7A271A}.ph .kb{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62);color:#fff;font-size:10px;font-style:normal;text-align:center;padding:1px 0;line-height:1.3}';
  document.head.appendChild(st);
 })();
 
@@ -644,7 +656,7 @@ new MutationObserver(()=>{V.querySelectorAll('small').forEach(s=>{const x=s.text
   V.querySelectorAll('#lr td').forEach(td=>{
    if(td.dataset.n)return;td.dataset.n='1';
    const a=td.querySelectorAll('a[target="_blank"]');
-   if(a.length>1)a.forEach((x,i)=>{if(x.textContent.trim()==='Foto')x.textContent='Foto '+(i+1)})})};
+   if(a.length>1){const tot={Foto:0,PDF:0},no={Foto:0,PDF:0};a.forEach(x=>{const t=x.textContent.trim();if(t in tot)tot[t]++});a.forEach(x=>{const t=x.textContent.trim();if(t in tot){no[t]++;if(tot[t]>1)x.textContent=t+' '+no[t]}})}})};
  new MutationObserver(sync).observe(V,{childList:true,subtree:true});
 })();
 
@@ -798,8 +810,9 @@ try{const f=fld;fld=function(a){if(a&&a[0]=='Jenis')return'<input type="hidden" 
  const isUrl=x=>/^https?:/i.test(x);
 
  function paras(v){
-  const ls=String(v==null?'':v).replace(bad,'').split('\n'),nu=ls.filter(x=>isUrl(x.trim())).length;let k=0;
-  return ls.map(x=>{x=x.trim();if(isUrl(x)){k++;const u=x;return(nu>1?['Foto',String(k)]:['Foto']).map(t=>({t,u}))}return x?x.split(/\s+/).map(t=>({t})):[]})}
+  const ls=String(v==null?'':v).replace(bad,'').split('\n'),tot={Foto:0,PDF:0},no={Foto:0,PDF:0};
+  ls.forEach(x=>{if(isUrl(x.trim()))tot[lnkL(x.trim())]++});
+  return ls.map(x=>{x=x.trim();if(isUrl(x)){const L=lnkL(x);no[L]++;const u=x;return(tot[L]>1?[L,String(no[L])]:[L]).map(t=>({t,u}))}return x?x.split(/\s+/).map(t=>({t})):[]})}
  function wrap(ps,mw,fs,b,maxL){
   const L=[],sp=tw(' ',fs,b);
   for(const p of ps){
@@ -1299,7 +1312,7 @@ body[data-p=input] #v{row-gap:20px}
  function val(v){
   const s=String(v==null?'':v).trim();if(!s)return '';
   const ln=s.split('\n').map(x=>x.trim()).filter(Boolean),u=ln.filter(x=>/^https?:/i.test(x)),o=ln.filter(x=>!/^https?:/i.test(x));
-  return o.map(esc).join('\n')+(o.length&&u.length?'\n':'')+u.map((x,i)=>'<a href="'+esc(x)+'" target="_blank" rel="noopener">'+(u.length>1?'Foto '+(i+1):'Foto')+'</a>').join('')}
+  return o.map(esc).join('\n')+(o.length&&u.length?'\n':'')+(()=>{const tot={Foto:0,PDF:0},no={Foto:0,PDF:0};u.forEach(x=>tot[lnkL(x)]++);return u.map(x=>{const L=lnkL(x);no[L]++;return'<a href="'+esc(x)+'" target="_blank" rel="noopener">'+(tot[L]>1?L+' '+no[L]:L)+'</a>'}).join('')})()}
  const plain=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
 
  let O=null,pushed=false,view='',vpref='',fz=0,lw=0,rt=0,D=null,qs='',tm=0,prevFocus=null,prevOv='';
