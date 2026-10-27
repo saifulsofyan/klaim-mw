@@ -45,6 +45,7 @@ nav button.on{color:var(--b)}
 .lcT{width:100%;table-layout:fixed;white-space:normal;border-collapse:separate;border-spacing:0;margin-top:12px;font-size:13px;border:1px solid var(--ln);border-radius:12px;overflow:hidden}
 .lcT th,.lcT td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--ln);line-height:1.25}.lcT th:first-child,.lcT td:first-child{text-align:left;padding-left:10px}.lcT th:last-child,.lcT td:last-child{padding-right:10px}
 .lcT thead th{background:#F1F3F8;font-size:11.5px;vertical-align:bottom;font-weight:700;color:var(--t)}.lcT thead tr.ra th{background:#DDF2FA;color:#0E7490;font-size:13px;font-weight:800}
+.lcC{margin:14px 2px 0;font-size:12px;color:var(--t)}.lcC+.lcT{margin-top:6px}
 .lcT td small{display:block;color:var(--t);font-size:11px;font-weight:400}.lcT tbody tr:last-child td{border-bottom:0}
 .mc{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:12px;background:var(--bg);padding:12px;margin-top:12px;color:var(--t);text-align:left}
 .mc div:nth-child(2){flex:1}.mc b{display:block;font-size:18px;color:var(--fg)}.mc span{font-size:13px;color:var(--m)}
@@ -298,26 +299,38 @@ render=async function(){
 vInput=async function(){
  await _vInput();
  if(canLC())V.insertAdjacentHTML('beforeend',`<button class="mc c7" onclick="go('form','LC')"><div class="ico" style="width:64px;height:64px;background:rgba(255,255,255,.65)">${ic('car',36,'var(--fg)')}</div><div><b>Input LC</b><span>Input data LC kendaraan (Bengkel)</span></div>${ic('chevr',22,'var(--fg)')}</button>`)};
+
+
+const rrDash=async mm=>{
+ const rp=n=>n==null?'-':'Rp '+Math.round(n).toLocaleString('id-ID');
+ const bi=v=>{const t=String(v==null?'':v).replace(/\D/g,'');return t===''?null:+t};
+ const tabel=(cap,jml,rr,baku,rs,kf)=>{
+  const g={},al={b:0,bn:0};
+  rs.forEach(x=>{const nm=String(kf(x)==null?'':kf(x)).trim(),k=nm.toLowerCase(),o=g[k]||(g[k]={k:nm,n:0,b:0,bn:0}),v=bi(x.Biaya);o.n++;if(v!==null){o.b+=v;o.bn++;al.b+=v;al.bn++}});
+  const tr=(nm,sub,o)=>`<tr><td><b>${nm}</b>${sub?'<small>'+sub+'</small>':''}</td><td>${o?o.n:0}</td><td>${rp(o&&o.bn?o.b/o.bn:null)}</td></tr>`;
+  const pk=baku.map(b=>b[0].toLowerCase()),lain=Object.keys(g).filter(k=>pk.indexOf(k)<0).map(k=>g[k]);
+  return`<p class="lcC">${cap}</p><table class="lcT"><colgroup><col style="width:42%"><col style="width:22%"><col style="width:36%"></colgroup><thead><tr class="ra"><th colspan="2">Rerata All</th><th>${rp(al.bn?al.b/al.bn:null)}</th></tr><tr><th>Jenis</th><th>${jml}</th><th>${rr}</th></tr></thead><tbody>${baku.map(b=>tr(b[1],b[2],g[b[0].toLowerCase()])).join('')+lain.map(o=>tr(o.k?esc(o.k):'Belum diisi','',o)).join('')}</tbody></table>`};
+ const lc=async()=>{
+  const rs=(await run('report','LC',mm))||[];if(P!='dash'||M!=mm)return;
+  const el=document.getElementById('lcTb');if(!el||!rs.length)return;
+  el.innerHTML=tabel('LC · biaya dari Estimasi Biaya Perbaikan (Input LC)','Jumlah LC','Rerata Biaya LC',[['All New Avanza','New Transmover','All New Avanza'],['Avanza','Transmover','Avanza'],['Mobilio','Mobilio','']],rs,x=>x.JenisKendaraan)};
+ const kl=async()=>{
+  const rs=((await run('report','RK',mm))||[]).filter(x=>String(x.TglKejadian||'')!=='');if(P!='dash'||M!=mm)return;
+  const c=[...V.querySelectorAll('.cd')].find(x=>{const h=x.querySelector('h3');return h&&/Jenis Kerusakan/i.test(h.textContent)});if(!c||!rs.length)return;
+  let el=c.querySelector('#klTb');if(!el){c.insertAdjacentHTML('beforeend','<div id="klTb"></div>');el=c.querySelector('#klTb')}
+  el.innerHTML=tabel('Klaim · biaya dari Estimasi Biaya (Input Bengkel)','Jumlah Klaim','Rerata Biaya Klaim',[['Stiker','Stiker',''],['Reguler','Reguler',''],['CNG','CNG','']],rs,x=>x.JenisMobil)};
+ await Promise.all([lc,kl].map(f=>f().catch(()=>{})))};
 vDash=async function(){
  await _vDash();
  try{
   const mm=M,s=await run('lcSummary',mm);
   if(P!='dash'||M!=mm)return;
   const kt=(c,t,n)=>`<div class="dm ${c}" style="flex:1"><b>${t}</b><div><span class="n">${n}</span> <small>Unit</small></div></div>`;
-
-  const rp=n=>n==null?'-':'Rp '+Math.round(n).toLocaleString('id-ID'),hr=n=>n==null?'-':String(+(+n).toFixed(2)).replace('.',',')+' hari';
-  const KEND=[['All New Avanza','New Transmover'],['Avanza','Transmover'],['Mobilio','Mobilio']];
-  let tb='';
-  if(Array.isArray(s.jenis)&&s.total>0){
-   const by={};s.jenis.forEach(o=>{by[String(o.k).toLowerCase()]=o});
-   const tr=(nm,sub,o)=>`<tr><td><b>${nm}</b>${sub?'<small>'+sub+'</small>':''}</td><td>${o?o.n:0}</td><td>${rp(o&&o.b)}</td><td>${hr(o&&o.l)}</td></tr>`;
-   const baku=KEND.map(k=>k[0].toLowerCase()),lain=s.jenis.filter(o=>baku.indexOf(String(o.k).toLowerCase())<0);
-   const ra=s.rata||{};
-   tb=`<table class="lcT"><colgroup><col style="width:32%"><col style="width:15%"><col style="width:30%"><col style="width:23%"></colgroup><thead><tr class="ra"><th colspan="2">Rerata All</th><th>${rp(ra.b)}</th><th>${hr(ra.l)}</th></tr><tr><th>Jenis</th><th>Jumlah LC</th><th>Rerata Biaya LC</th><th>Rerata Lama</th></tr></thead><tbody>${KEND.map(k=>tr(k[1],k[1]==k[0]?'':k[0],by[k[0].toLowerCase()])).join('')+lain.map(o=>tr(o.k?esc(o.k):'Belum diisi','',o)).join('')}</tbody></table>`}
-  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)}</div>${tb}</div>`;
+  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)}</div><div id="lcTb"></div></div>`;
   const f=V.querySelector('.cd.hd');
   if(f)f.insertAdjacentHTML('beforebegin',html);else V.insertAdjacentHTML('beforeend',html)
- }catch(e){}};
+ }catch(e){}
+ rrDash(M).catch(()=>{})};
 async function vLC(){
  head({t:'Input LC',s:'Bengkel - LC Kendaraan',i:'car',c:'#0E7490',back:'input'});PH={};
  if(!canLC()){V.innerHTML='<div class="cd">Input LC hanya bisa dibuka oleh akun Bengkel.</div>';return}
