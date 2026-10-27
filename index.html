@@ -42,6 +42,10 @@ nav button.on{color:var(--b)}
 .g5 .tl.rk{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:2px 10px;padding:14px 8px}.g5 .tl.rk small{flex-basis:100%;text-align:center;font-size:11px;opacity:.8}.g5 .tl{padding:10px 2px;font-size:11px}.g5 .tl b{white-space:normal;text-align:center}.sel{outline:2px solid var(--fg)}
 .dm{background:var(--bg);color:var(--fg);border-radius:12px;padding:8px 0;text-align:center}.dm b{font-size:13px}.dm .n{font-size:34px;font-weight:800}.dm small{color:var(--t);font-size:13px}
 .tot{background:#F1F3F8;border-radius:10px;padding:6px 12px;text-align:center;font-size:11px}.tot b{display:block;font-size:16px}
+.lcT{width:100%;table-layout:fixed;white-space:normal;border-collapse:separate;border-spacing:0;margin-top:12px;font-size:13px;border:1px solid var(--ln);border-radius:12px;overflow:hidden}
+.lcT th,.lcT td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--ln);line-height:1.25}.lcT th:first-child,.lcT td:first-child{text-align:left;padding-left:10px}.lcT th:last-child,.lcT td:last-child{padding-right:10px}
+.lcT thead th{background:#F1F3F8;font-size:11.5px;vertical-align:bottom;font-weight:700;color:var(--t)}.lcT thead tr.ra th{background:#DDF2FA;color:#0E7490;font-size:13px;font-weight:800}
+.lcT td small{display:block;color:var(--t);font-size:11px;font-weight:400}.lcT tbody tr:last-child td{border-bottom:0}
 .mc{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:12px;background:var(--bg);padding:12px;margin-top:12px;color:var(--t);text-align:left}
 .mc div:nth-child(2){flex:1}.mc b{display:block;font-size:18px;color:var(--fg)}.mc span{font-size:13px;color:var(--m)}
 .f{display:block;margin-bottom:12px}.l{display:block;font-size:12px;font-weight:700}.rq{color:#D00}
@@ -300,7 +304,17 @@ vDash=async function(){
   const mm=M,s=await run('lcSummary',mm);
   if(P!='dash'||M!=mm)return;
   const kt=(c,t,n)=>`<div class="dm ${c}" style="flex:1"><b>${t}</b><div><span class="n">${n}</span> <small>Unit</small></div></div>`;
-  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)+kt('c4','Tunda',s.tunda)}</div></div>`;
+
+  const rp=n=>n==null?'-':'Rp '+Math.round(n).toLocaleString('id-ID'),hr=n=>n==null?'-':String(+(+n).toFixed(2)).replace('.',',')+' hari';
+  const KEND=[['All New Avanza','New Transmover'],['Avanza','Transmover'],['Mobilio','Mobilio']];
+  let tb='';
+  if(Array.isArray(s.jenis)&&s.total>0){
+   const by={};s.jenis.forEach(o=>{by[String(o.k).toLowerCase()]=o});
+   const tr=(nm,sub,o)=>`<tr><td><b>${nm}</b>${sub?'<small>'+sub+'</small>':''}</td><td>${o?o.n:0}</td><td>${rp(o&&o.b)}</td><td>${hr(o&&o.l)}</td></tr>`;
+   const baku=KEND.map(k=>k[0].toLowerCase()),lain=s.jenis.filter(o=>baku.indexOf(String(o.k).toLowerCase())<0);
+   const ra=s.rata||{};
+   tb=`<table class="lcT"><colgroup><col style="width:32%"><col style="width:15%"><col style="width:30%"><col style="width:23%"></colgroup><thead><tr class="ra"><th colspan="2">Rerata All</th><th>${rp(ra.b)}</th><th>${hr(ra.l)}</th></tr><tr><th>Jenis</th><th>Jumlah LC</th><th>Rerata Biaya LC</th><th>Rerata Lama</th></tr></thead><tbody>${KEND.map(k=>tr(k[1],k[1]==k[0]?'':k[0],by[k[0].toLowerCase()])).join('')+lain.map(o=>tr(o.k?esc(o.k):'Belum diisi','',o)).join('')}</tbody></table>`}
+  const html=`<div class="cd"><div class="hd"><div class="ico c7">${ic('car',22,'var(--fg)')}</div><h3>Input LC</h3><div class="tot">Total<b>${s.total} Unit</b></div></div><div class="row">${kt('c3','Selesai',s.selesai)}</div>${tb}</div>`;
   const f=V.querySelector('.cd.hd');
   if(f)f.insertAdjacentHTML('beforebegin',html);else V.insertAdjacentHTML('beforeend',html)
  }catch(e){}};
