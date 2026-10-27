@@ -566,8 +566,8 @@ try{const f=saveLC;saveLC=function(){const el=$('#lcForm [name="EstLama"]');
  if(el&&el.tagName=='INPUT'&&el.value.trim()){const v=estOk(el.value);if(v===null)return toast('Estimasi hanya angka. Contoh: 2, 1/2, 2/7, 2 1/7 (angka dan pecahan pakai spasi)');el.value=v}
  return f.apply(this,arguments)}}catch(e){}
 
-try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',0])}}catch(e){}
-new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (tidak wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
+try{if(!LCF.some(x=>x[0]=='NoMO')){const i=LCF.findIndex(x=>x[0]=='NoMobil');if(i>=0)LCF.splice(i+1,0,['NoMO','Nomor MO','text','',1])}}catch(e){}
+new MutationObserver(()=>{const el=$('#lcForm [name="NoMO"]');if(!el||el.tagName!='INPUT'||el.dataset.mo)return;el.dataset.mo='1';el.setAttribute('placeholder','Isi manual (wajib)');el.setAttribute('autocomplete','off');el.setAttribute('maxlength','30')}).observe(V,{childList:true,subtree:true});
 
 function estOk(v){
  v=String(v).trim().replace(/\s*hari$/i,'').replace(/\s+/g,' ');let m;
@@ -1113,7 +1113,7 @@ body[data-p=set] #app #v>.cd{max-width:1000px}
 }
 @media screen and (min-width:1280px){
  body[data-p=dash] #v,body[data-p=input] #v{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;align-content:start}
-body[data-p=dash] #v>.mp,body[data-p=dash] #v>.bn,body[data-p=dash] #v>.cd:nth-child(3),body[data-p=dash] #v>.cd.hd,body[data-p=input] #v>.mp,body[data-p=input] #v>.bn{grid-column:1/-1}
+body[data-p=dash] #v>.mp,body[data-p=dash] #v>.bn,body[data-p=dash] #v>.bn+.cd,body[data-p=dash] #v>.accBn,body[data-p=dash] #v>.cd.hd,body[data-p=input] #v>.mp,body[data-p=input] #v>.bn{grid-column:1/-1}
 body[data-p=input] #v{row-gap:20px}
 
 }
@@ -1516,7 +1516,7 @@ body[data-p=input] #v{row-gap:20px}
  window.accDlg=function(msg){
   const old=document.getElementById('accDlg');if(old)old.remove();
   const d=document.createElement('div');d.className='accO';d.id='accDlg';
-  d.innerHTML='<div class="accB" role="alertdialog" aria-modal="true"><h3>Perlu ACC Admin</h3><p>'+esc(msg)+'</p><button type="button" class="btn p" style="width:100%">Mengerti</button></div>';
+  d.innerHTML='<div class="accB" role="alertdialog" aria-modal="true"><h3>'+(/ACC/.test(msg)?'Perlu ACC Admin':'Periksa Nomor Mobil')+'</h3><p>'+esc(msg)+'</p><button type="button" class="btn p" style="width:100%">Mengerti</button></div>';
   d.querySelector('button').onclick=()=>d.remove();
   document.body.appendChild(d)};
 
@@ -1533,7 +1533,30 @@ body[data-p=input] #v{row-gap:20px}
   finally{window.ACCC=false}
   return f.apply(this,arguments)}}catch(e){}
 
+ try{const f=save;save=async function(){
+  if(X!='Klaim'||isAdm())return f.apply(this,arguments);
+  const form=$('#dataForm');if(!form)return f.apply(this,arguments);
+  const g=k=>{const e=form.querySelector('[name="'+k+'"]');return e?e.value.trim():''};
+  for(const[k,,t,,r]of FM.Klaim.f)if(r&&(t=='foto'?!(PH[k]||[]).length:!g(k)))return f.apply(this,arguments);
+  if(window.ACCC||window.SV)return;
+  const nr=form.querySelector('#NoReg');
+  window.ACCC=true;toast('Memeriksa nomor mobil…');
+  try{await run('klaimCek',g('NoMobil'),nr&&nr.dataset.s?g('NoReg'):'')}
+  catch(e){const m=String((e&&e.message)||'');if(/ACC|Master Kendaraan/.test(m)){accDlg(m);return}}
+  finally{window.ACCC=false}
+  return f.apply(this,arguments)}}catch(e){}
+
+ {let MKL=[];
+  const mkFill=()=>{let d=document.getElementById('dlMK');if(!d){d=document.createElement('datalist');d.id='dlMK';document.body.appendChild(d)}d.innerHTML=MKL.map(x=>'<option value="'+esc(x)+'">').join('')};
+  new MutationObserver(()=>{
+   const el=document.querySelector('#dataForm [name="NoMobil"]');
+   if(!el||el.tagName!='INPUT'||el.dataset.mk||X!='Klaim')return;
+   el.dataset.mk='1';el.setAttribute('list','dlMK');el.setAttribute('autocomplete','off');
+   run('masterKend').then(l=>{MKL=Array.isArray(l)?l:[];mkFill();if(MKL.length&&!el.getAttribute('placeholder'))el.setAttribute('placeholder','Ketik atau pilih dari daftar')}).catch(()=>{})
+  }).observe(V,{childList:true,subtree:true})}
+
  let AL=[];
+ const isK=x=>String(x.ID||'').indexOf('K|')==0,jn=x=>isK(x)?'Input Klaim':'Input LC';
  const row=(x,i)=>{
   const b=(k,t,c)=>`<button type="button" class="btn ${c}" onclick="accKep(${i},'${k}')">${t}</button>`;
   let a='';
@@ -1541,15 +1564,15 @@ body[data-p=input] #v{row-gap:20px}
   else if(x.Status=='ACC')a=`<div class="row">${b('Ditolak','Batalkan ACC','s')}</div>`;
   else if(x.Status=='Ditolak')a=`<div class="row">${b('ACC','ACC','p')}</div>`;
   const info=x.Status=='Terpakai'?`Dipakai untuk input <b>${esc(x.NoRegBaru)}</b>`:(x.Keputusan?`Diputuskan ${esc(x.Keputusan)} · ${esc(x.TglKeputusan)}`:'');
-  return `<div class="accR"><b>${esc(x.NoMobil)}</b><span class="accS ${esc(x.Status)}">${esc(x.Status)}</span><small>Diminta ${esc(x.Peminta)} · ${esc(x.Tanggal)}<br>Sudah ada di Input LC: ${esc(x.NoRegAda)} (bulan ${esc(x.Bulan)})${info?'<br>'+info:''}</small>${a}</div>`};
+  return `<div class="accR"><b>${esc(x.NoMobil)}</b><span class="accS ${esc(x.Status)}">${esc(x.Status)}</span><small>Diminta ${esc(x.Peminta)} · ${esc(x.Tanggal)}<br>Sudah ada di ${jn(x)}: ${esc(x.NoRegAda)} (bulan ${esc(x.Bulan)})${info?'<br>'+info:''}</small>${a}</div>`};
  const card=()=>{
   const n=AL.filter(x=>x.Status=='Menunggu').length;
-  return `<div class="hd"><div class="ico c3">${ic('car',22,'var(--fg)')}</div><div style="flex:1"><h3>ACC Input LC</h3><small>Nomor mobil sama 2x dalam 1 bulan${n?' · <b style="color:#B45309">'+n+' menunggu</b>':''}</small></div></div>`+
+  return `<div class="hd"><div class="ico c3">${ic('car',22,'var(--fg)')}</div><div style="flex:1"><h3>ACC Nomor Mobil Ganda</h3><small>Input Klaim &amp; Input LC · nomor mobil sama 2x dalam 1 bulan${n?' · <b style="color:#B45309">'+n+' menunggu</b>':''}</small></div></div>`+
    (AL.length?AL.map(row).join(''):'<p style="color:var(--m);font-size:13.5px;margin:4px 0 2px">Belum ada permintaan ACC.</p>')};
  const paint=()=>{const c=document.getElementById('accCd');if(c)c.innerHTML=card()};
  window.accKep=async function(i,k){
   const x=AL[i];if(!x||window.ACCK)return;window.ACCK=true;
-  try{await run('accPutus',x.ID,k);toast(k=='ACC'?'ACC diberikan untuk '+x.NoMobil+'. Petugas Cat bisa input satu kali.':'Permintaan '+x.NoMobil+' ditolak');AL=await run('accList');paint()}
+  try{await run('accPutus',x.ID,k);toast(k=='ACC'?'ACC diberikan untuk '+x.NoMobil+'. Petugas '+(isK(x)?'Security':'Cat')+' bisa input satu kali.':'Permintaan '+x.NoMobil+' ditolak');AL=await run('accList');paint()}
   catch(e){toast(e.message||'Gagal menyimpan keputusan')}
   finally{window.ACCK=false}};
  try{const f=vSet;vSet=async function(){
@@ -1566,7 +1589,7 @@ body[data-p=input] #v{row-gap:20px}
    if(P!='dash'||!isAdm())return;
    const o=document.getElementById('accBn');if(o)o.remove();
    const n=(l||[]).filter(x=>x.Status=='Menunggu').length;
-   if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC Input LC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{})};
+   if(n)V.insertAdjacentHTML('afterbegin',`<div class="accBn" id="accBn" onclick="go('set')"><span>${n} permintaan ACC menunggu keputusan Anda</span><b>Buka ›</b></div>`)}).catch(()=>{})};
  try{const f=vDash;vDash=async function(){
   const r=await f.apply(this,arguments);
   window.accBnRefresh();
